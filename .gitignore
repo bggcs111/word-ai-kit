@@ -1,0 +1,48 @@
+# 敏感配置文件（防止 API Key 泄露）
+.wordaikit_config.json
+*.env
+.env.local
+.env.*.local
+
+# 上传和临时文件
+uploads/
+temp/
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log

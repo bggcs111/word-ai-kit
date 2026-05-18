@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WordAiKit - Word 文档智能处理</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 WordAiKit</h1>
+            <p>Word 文档智能处理服务 - 文字润色 · 保留图片/表格/公式</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-label">当前模型:</span>
+                <span class="model-badge" id="currentModel">加载中...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">服务状态:</span>
+                <span class="status-value" id="serviceStatus">检查中...</span>
+            </div>
+            <div class="status-item model-selector">
+                <span class="status-label">切换模型:</span>
+                <select id="modelSelect">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="content">
+            <div id="alertContainer"></div>
+
+            <!-- 日志信息框 -->
+            <div class="section">
+                <div class="section-title">运行日志</div>
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <label style="font-weight: 500; color: #495057;">日志信息</label>
+                        <button class="btn btn-secondary" onclick="clearLogs()" style="padding: 6px 12px; font-size: 12px;">
+                            🗑️ 清除日志
+                        </button>
+                    </div>
+                    <textarea id="logBox" class="form-control" rows="6" readonly style="font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; resize: vertical; white-space: pre-wrap; word-wrap: break-word;"></textarea>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">配置管理</div>
+                <div class="card">
+                    <div class="form-group">
+                        <label>配置方式</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button class="btn btn-primary" onclick="openConfigModal()">
+                                ⚙️ 在线配置
+                            </button>
+                            <span style="color: #6c757d; font-size: 14px;">推荐使用在线配置，配置信息将安全保存</span>
+                        </div>
+                        <div class="file-hint" style="margin-top: 8px;">点击"配置管理"按钮通过 Web 界面配置 API Key，配置将自动保存到本地</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">上传文档</div>
+                <div class="card">
+                    <div class="file-input-wrapper">
+                        <input type="file" id="fileInput" accept=".docx">
+                        <label for="fileInput" class="file-input-label" id="fileLabel">
+                            <div class="file-icon">📄</div>
+                            <div class="file-name">点击上传文档</div>
+                            <div class="file-hint">支持 .docx 格式的 Word 文档</div>
+                        </label>
+                    </div>
+                    <div class="actions" style="margin-top: 20px;">
+                        <button class="btn btn-primary" id="processBtn" onclick="processDocument()" disabled>
+                            🚀 开始处理
+                        </button>
+                    </div>
+
+                    <div class="progress-container" id="progressContainer">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">正在处理文档...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section result-section" id="resultSection">
+                <div class="section-title">处理结果</div>
+                <div class="result-info">
+                    <div class="result-icon">✅</div>
+                    <div class="result-details">
+                        <div class="result-title" id="resultTitle">处理成功</div>
+                        <div class="result-desc" id="resultDesc">文档已处理完成</div>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-success" onclick="downloadResult()">
+                        ⬇️ 下载处理后的文档
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 页面底部 - 项目信息 -->
+        <div class="footer">
+            <div class="footer-content">
+                <!-- 项目地址 -->
+                <div class="footer-item">
+                    <span class="footer-label">项目地址：</span>
+                    <span class="footer-value">
+                        <a href="https://github.com/bggcs111/word-ai-kit" target="_blank">https://github.com/bggcs111/word-ai-kit</a>
+                    </span>
+                </div>
+                
+                <!-- 问题反馈 -->
+                <div class="footer-item">
+                    <span class="footer-label">问题反馈：</span>
+                    <span class="footer-value">
+                        <a href="https://github.com/bggcs111/word-ai-kit/issues" target="_blank">GitHub Issues</a>
+                    </span>
+                </div>
+                
+                <!-- 软件版本项 -->
+                <div class="footer-item">
+                    <span class="footer-label">软件版本：</span>
+                    <span class="footer-value">v1.0.0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 配置管理模态框 -->
+    <div id="configModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚙️ 模型配置管理</h3>
+                <span class="close" onclick="closeConfigModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <!-- 配置文件路径管理 -->
+                <div class="storage-path-section">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>📁 配置文件保存路径</label>
+                        <div style="display: flex; gap: 10px; align-items: stretch;">
+                            <input type="text" class="form-control" id="storagePath" placeholder="例如：C:\Users\用户名\Documents 或 D:\MyConfig" style="flex: 1;">
+                            <button class="btn btn-secondary" onclick="saveStoragePath()" style="white-space: nowrap;">💾 保存路径</button>
+                        </div>
+                        <small style="color: #6c757d; display: block; margin-top: 8px;">
+                            💡 请填写<strong>完整绝对路径</strong>（如：C:\Users\用户名\Documents）
+                        </small>
+                        <small style="color: #dc3545; display: block; margin-top: 3px;">
+                            ⚠️ 配置文件不能保存在项目目录中，建议保存在文档目录或自定义目录
+                        </small>
+                    </div>
+                </div>
+
+                <div class="config-tabs">
+                    <button class="tab-btn active" onclick="openTab('deepseek')">DeepSeek</button>
+                    <button class="tab-btn" onclick="openTab('aliyun')">阿里百炼</button>
+                    <button class="tab-btn" onclick="openTab('kimi')">Kimi</button>
+                </div>
+                
+                <div id="deepseek" class="tab-content active">
+                    <div class="form-group">
+                        <label for="deepseekApiKey">API Key</label>
+                        <input type="password" class="form-control" id="deepseekApiKey" placeholder="输入 DeepSeek API Key">
+                    </div>
+                    <div class="form-group">
+                        <label for="deepseekBaseUrl">Base URL</label>
+                        <input type="text" class="form-control" id="deepseekBaseUrl" value="https://api.deepseek.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="deepseekModel">模型名称</label>
+                        <input type="text" class="form-control" id="deepseekModel" value="deepseek-chat">
+                    </div>
+                </div>
+                
+                <div id="aliyun" class="tab-content">
+                    <div class="form-group">
+                        <label for="aliyunApiKey">API Key</label>
+                        <input type="password" class="form-control" id="aliyunApiKey" placeholder="输入阿里百炼 API Key">
+                    </div>
+                    <div class="form-group">
+                        <label for="aliyunBaseUrl">Base URL</label>
+                        <input type="text" class="form-control" id="aliyunBaseUrl" value="https://dashscope.aliyuncs.com/compatible-mode/v1">
+                    </div>
+                    <div class="form-group">
+                        <label for="aliyunModel">模型名称</label>
+                        <input type="text" class="form-control" id="aliyunModel" value="qwen3.5-plus">
+                    </div>
+                </div>
+                
+                <div id="kimi" class="tab-content">
+                    <div class="form-group">
+                        <label for="kimiApiKey">API Key</label>
+                        <input type="password" class="form-control" id="kimiApiKey" placeholder="输入 Kimi API Key">
+                    </div>
+                    <div class="form-group">
+                        <label for="kimiBaseUrl">Base URL</label>
+                        <input type="text" class="form-control" id="kimiBaseUrl" value="https://api.moonshot.cn/v1">
+                    </div>
+                    <div class="form-group">
+                        <label for="kimiModel">模型名称</label>
+                        <input type="text" class="form-control" id="kimiModel" value="kimi-k2.5">
+                    </div>
+                </div>
+                
+                <div class="config-status" id="configStatus">
+                    <div class="status-item">
+                        <span class="status-label">DeepSeek:</span>
+                        <span class="status-badge" id="deepseekStatus">未配置</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">阿里百炼:</span>
+                        <span class="status-badge" id="aliyunStatus">未配置</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Kimi:</span>
+                        <span class="status-badge" id="kimiStatus">未配置</span>
+                    </div>
+                </div>
+
+                <!-- 测试结果显示区域 -->
+                <div class="test-result" id="testResult">
+                    <div class="test-result-title" id="testResultTitle"></div>
+                    <div class="test-result-content" id="testResultContent"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="testCurrentConfig()">🧪 测试配置</button>
+                <button class="btn btn-primary" onclick="saveCurrentConfig()">💾 保存配置</button>
+                <button class="btn btn-secondary" onclick="closeConfigModal()">❌ 关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=20260428"></script>
+</body>
+</html>
