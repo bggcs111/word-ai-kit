@@ -138,6 +138,13 @@ python main.py
 
 欢迎提交 Issue 和 Pull Request
 
+## 😉 QQ交流群
+
+WordAiKit交流群：1081856288
+
+
+
+
 ---
 
 <p align="center">
