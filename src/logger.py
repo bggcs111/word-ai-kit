@@ -54,9 +54,8 @@ logger = setup_logger()
 
 
 def log_info(message: str):
-    """记录 INFO 级别日志"""
+    """记录 INFO 级别日志（仅写入文件，不打印到控制台）"""
     logger.info(message)
-    print(f"[INFO] {message}")
 
 
 def log_error(message: str):

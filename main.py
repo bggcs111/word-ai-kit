@@ -25,11 +25,6 @@ routes.set_config_manager(config_manager)
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时执行
-    print("=" * 60)
-    print("Word 智能处理服务启动中...")
-    print(f"当前模型：{config_manager.get_current_model()}")
-    print("访问地址：http://localhost:8000")
-    print("=" * 60)
     log_info("Word 智能处理服务启动")
 
     # 延迟打开浏览器，确保服务已启动
@@ -38,7 +33,6 @@ async def lifespan(app: FastAPI):
 
     yield
     # 关闭时执行（清理缓存资源）
-    print("\n🛑 服务正在关闭，清理缓存...")
     clear_cache_on_exit(keep_recent_uploads=0)
     log_info("Word 智能处理服务关闭")
 

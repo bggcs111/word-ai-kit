@@ -8,6 +8,7 @@
 uploads/
 temp/
 logs/
+templates/
 
 # Python
 __pycache__/

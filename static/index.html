@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>WordAiKit - Word 文档智能处理</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -64,16 +67,151 @@
             </div>
 
             <div class="section">
+                <div class="section-title">处理模式</div>
+                <div class="card">
+                    <div class="form-group">
+                        <label>选择处理模式</label>
+                        <div style="display: flex; gap: 15px; margin-top: 10px;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="processMode" value="normal" checked onchange="toggleProcessMode()">
+                                <span style="margin-left: 8px;">📝 普通润色模式</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="processMode" value="template" onchange="toggleProcessMode()">
+                                <span style="margin-left: 8px;">📋 模板输出模式</span>
+                            </label>
+                        </div>
+                        <div class="file-hint" style="margin-top: 8px;">
+                            普通模式：单篇docx文字润色，保留图表和公式，支持多种写作风格，可自定义标题、格式等<br>
+                            模板模式：重新组织原文档内容，智能生成新文档并参照模板格式输出，保留图表和公式
+                        </div>
+                    </div>
+                    
+                    <!-- 文档类型选择 -->
+                    <div id="docTypeSection" style="margin-top: 15px;">
+                        <div class="form-group">
+                            <label for="docTypeSelect">📚 文档类型（可选）</label>
+                            <select id="docTypeSelect" class="form-control" style="margin-top: 5px;">
+                                <option value="">-- 保持原文风格（默认） --</option>
+                                <option value="技术文档">技术文档</option>
+                                <option value="学术论文">学术论文</option>
+                                <option value="调研报告">调研报告</option>
+                                <option value="自媒体文章">自媒体文章</option>
+                                <option value="custom">自定义...</option>
+                            </select>
+                            <div id="customDocTypeDiv" style="margin-top: 10px; display: none;">
+                                <label for="customDocType">自定义文档类型</label>
+                                <input type="text" id="customDocType" class="form-control" placeholder="例如：商业计划书、产品说明书、工作总结...">
+                            </div>
+                            <div class="file-hint" style="margin-top: 5px;">
+                                💡 选择或输入文档类型，系统将采用相应的写作风格；留空则保持原文风格
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 用户自定义要求 -->
+                    <div id="userPromptSection" style="margin-top: 15px;">
+                        <div class="form-group">
+                            <label for="userPrompt">💡 用户自定义要求（可选）</label>
+                            <textarea id="userPrompt" class="form-control" rows="5" placeholder="在此输入您的各种要求，AI 会自动识别并执行：
+
+例如：
+- 使用娱乐新闻风格
+- 划分3个章节并为每个章节生成标题
+
+..."></textarea>
+                            <div class="file-hint" style="margin-top: 5px;">
+                                💡 您可以在这里输入要求，如文档风格、章节或图表标题、内容修改等，AI会智能识别并执行
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 模板选择（仅在模板模式下显示） -->
+                    <div id="templateSelection" style="display: none; margin-top: 15px;">
+                        <!-- 模板处理策略说明 -->
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label>🧠 模板处理策略</label>
+                            <div class="file-hint" style="margin-top: 8px;">
+                                <strong>AI生成式策略</strong>：AI理解原文后按模板生成新内容，更智能、更自然
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>📑 模板管理</label>
+                            <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button class="btn btn-primary" onclick="openTemplateUploadModal()" style="padding: 8px 16px;">
+                                    📤 上传模板文档
+                                </button>
+                                <button class="btn btn-secondary" onclick="loadTemplates()" style="padding: 8px 16px;">
+                                    🔄 刷新模板列表
+                                </button>
+                            </div>
+                            <div class="file-hint" style="margin-top: 8px;">
+                                上传 Word 模板文档（.docx），系统将自动提取样式和结构
+                            </div>
+                        </div>
+                        
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label for="templateSelect">选择已保存的模板</label>
+                            <select id="templateSelect" class="form-control" style="margin-top: 5px;">
+                                <option value="">-- 请选择模板 --</option>
+                            </select>
+                            <div id="templateInfo" class="file-hint" style="margin-top: 5px; display: none;"></div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>自定义模板 JSON（可选）</label>
+                            <input type="file" id="templateFileInput" accept=".json" style="margin-top: 5px;">
+                            <div class="file-hint" style="margin-top: 5px;">
+                                上传自定义模板 JSON 文件将覆盖选择的模板
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 模板上传模态框 -->
+            <div id="templateUploadModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>📤 上传 Word 模板文档</h3>
+                        <span class="close" onclick="closeTemplateUploadModal()">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>模板文档（.docx）</label>
+                            <input type="file" id="templateDocInput" accept=".docx">
+                            <div class="file-hint" style="margin-top: 5px;">
+                                上传包含格式和结构的 Word 文档，系统将自动提取模板信息
+                            </div>
+                        </div>
+                        <div id="templateUploadProgress" style="display: none; margin-top: 15px;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="templateProgressFill" style="width: 0%;"></div>
+                            </div>
+                            <div class="progress-text" id="templateProgressText">正在解析模板...</div>
+                        </div>
+                        <div id="templateUploadResult" style="display: none; margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" onclick="uploadTemplateDocument()">📤 上传并解析</button>
+                        <button class="btn btn-secondary" onclick="closeTemplateUploadModal()">❌ 关闭</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
                 <div class="section-title">上传文档</div>
                 <div class="card">
                     <div class="file-input-wrapper">
-                        <input type="file" id="fileInput" accept=".docx">
+                        <input type="file" id="fileInput" accept=".docx" multiple>
                         <label for="fileInput" class="file-input-label" id="fileLabel">
                             <div class="file-icon">📄</div>
                             <div class="file-name">点击上传文档</div>
-                            <div class="file-hint">支持 .docx 格式的 Word 文档</div>
+                            <div class="file-hint">支持 .docx 格式，可同时选择多个文档</div>
                         </label>
                     </div>
+                    <div id="fileList" style="display: none; margin-top: 10px;"></div>
                     <div class="actions" style="margin-top: 20px;">
                         <button class="btn btn-primary" id="processBtn" onclick="processDocument()" disabled>
                             🚀 开始处理
@@ -119,16 +257,14 @@
                 
                 <!-- 问题反馈 -->
                 <div class="footer-item">
-                    <span class="footer-label">问题反馈：</span>
-                    <span class="footer-value">
-                        <a href="https://github.com/bggcs111/word-ai-kit/issues" target="_blank">GitHub Issues</a>
-                    </span>
+                    <span class="footer-label">交流与反馈：</span>
+                    <span class="footer-value">qq群: 1081856288</span>
                 </div>
                 
                 <!-- 软件版本项 -->
                 <div class="footer-item">
                     <span class="footer-label">软件版本：</span>
-                    <span class="footer-value">v1.0.0</span>
+                    <span class="footer-value">v2.0.0</span>
                 </div>
             </div>
         </div>
@@ -163,6 +299,8 @@
                     <button class="tab-btn active" onclick="openTab('deepseek')">DeepSeek</button>
                     <button class="tab-btn" onclick="openTab('aliyun')">阿里百炼</button>
                     <button class="tab-btn" onclick="openTab('kimi')">Kimi</button>
+                    <button class="tab-btn" onclick="openTab('ollama')">Ollama</button>
+                    <button class="tab-btn" onclick="openTab('lmstudio')">LM Studio</button>
                 </div>
                 
                 <div id="deepseek" class="tab-content active">
@@ -210,6 +348,54 @@
                     </div>
                 </div>
                 
+                <div id="ollama" class="tab-content">
+                    <div class="form-group">
+                        <label for="ollamaApiKey">API Key</label>
+                        <input type="text" class="form-control" id="ollamaApiKey" value="ollama" placeholder="Ollama 默认不需要 API Key">
+                        <small style="color: #6c757d; display: block; margin-top: 5px;">
+                            💡 Ollama 默认不需要 API Key，使用默认值即可
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label for="ollamaBaseUrl">Base URL</label>
+                        <input type="text" class="form-control" id="ollamaBaseUrl" value="http://localhost:11434/v1">
+                        <small style="color: #6c757d; display: block; margin-top: 5px;">
+                            💡 Ollama 默认地址：http://localhost:11434/v1
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label for="ollamaModel">模型名称</label>
+                        <input type="text" class="form-control" id="ollamaModel" value="qwen2.5:7b">
+                        <small style="color: #6c757d; display: block; margin-top: 5px;">
+                            💡 常见模型：qwen2.5:7b, llama3.1:8b, deepseek-r1:8b 等
+                        </small>
+                    </div>
+                </div>
+                
+                <div id="lmstudio" class="tab-content">
+                    <div class="form-group">
+                        <label for="lmstudioApiKey">API Key</label>
+                        <input type="text" class="form-control" id="lmstudioApiKey" value="lmstudio" placeholder="LM Studio 默认不需要 API Key">
+                        <small style="color: #6c757d; display: block; margin-top: 5px;">
+                            💡 LM Studio 默认不需要 API Key，使用默认值即可
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label for="lmstudioBaseUrl">Base URL</label>
+                        <input type="text" class="form-control" id="lmstudioBaseUrl" value="http://localhost:1234/v1">
+                        <small style="color: #6c757d; display: block; margin-top: 5px;">
+                            💡 LM Studio 默认地址：http://localhost:1234/v1
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label for="lmstudioModel">模型名称</label>
+                        <input type="text" class="form-control" id="lmstudioModel" value="local-model">
+                        <small style="color: #6c757d; display: block; margin-top: 5px;">
+                            💡 LM Studio 会自动使用加载的模型，通常使用 local-model 即可
+                        </small>
+                    </div>
+                </div>
+                
                 <div class="config-status" id="configStatus">
                     <div class="status-item">
                         <span class="status-label">DeepSeek:</span>
@@ -222,6 +408,14 @@
                     <div class="status-item">
                         <span class="status-label">Kimi:</span>
                         <span class="status-badge" id="kimiStatus">未配置</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Ollama:</span>
+                        <span class="status-badge" id="ollamaStatus">未配置</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">LM Studio:</span>
+                        <span class="status-badge" id="lmstudioStatus">未配置</span>
                     </div>
                 </div>
 

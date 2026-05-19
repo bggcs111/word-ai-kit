@@ -3,27 +3,26 @@ API 路由模块
 """
 import os
 import re
-from fastapi import APIRouter, UploadFile, File, HTTPException
+import json
+from urllib.parse import quote
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 from src.logger import log_info, log_error, log_success, log_warning
 
 router = APIRouter()
 
-# 全局 ConfigManager 实例
 _config_manager = None
 
 
 def set_config_manager(manager):
-    """设置全局 ConfigManager 实例"""
     global _config_manager
     _config_manager = manager
 
 
 def get_config_manager():
-    """获取全局 ConfigManager 实例"""
     return _config_manager
 
 
@@ -281,6 +280,12 @@ class StoragePathRequest(BaseModel):
     storage_path: str
 
 
+class TemplateProcessRequest(BaseModel):
+    """模板处理请求模型"""
+    template_id: str  # 模板 ID（使用预定义模板）
+    template_json: Optional[Dict] = None  # 自定义模板 JSON（可选）
+
+
 @router.get("/")
 async def root():
     """根路由"""
@@ -301,32 +306,34 @@ async def root():
 
 
 @router.post("/process")
-async def process_document(file: UploadFile = File(...)):
-    """处理上传的 Word 文档"""
+async def process_document(
+    files: List[UploadFile] = File(...),
+    user_prompt: str = Form(None),
+    doc_type: str = Form(None)
+):
+    """处理上传的 Word 文档（支持多文件）"""
     from src.config import ConfigManager
     from src.parser import DocumentParser
     from src.ai_processor import AIProcessor
     from src.builder import DocumentBuilder
     from openai import OpenAI
 
-    log_info(f"收到文档处理请求：{file.filename}")
+    log_info(f"收到文档处理请求：{len(files)} 个文件")
 
-    # 验证文件大小（限制 50MB）
-    file_content = await file.read()
-    if len(file_content) > 50 * 1024 * 1024:
-        log_warning(f"文档文件过大：{len(file_content)} bytes")
-        raise HTTPException(status_code=400, detail="文档文件大小不能超过 50MB")
-
-    # 上传目录
     upload_dir = Path("./uploads")
     upload_dir.mkdir(exist_ok=True)
 
-    safe_filename = Path(file.filename).name
-    input_path = upload_dir / safe_filename
-    with open(input_path, "wb") as f:
-        f.write(file_content)
+    input_paths = []
+    for file in files:
+        file_content = await file.read()
+        if len(file_content) > 50 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail=f"文件 {file.filename} 大小不能超过 50MB")
+        safe_filename = Path(file.filename).name
+        input_path = upload_dir / safe_filename
+        with open(input_path, "wb") as f:
+            f.write(file_content)
+        input_paths.append((safe_filename, input_path))
 
-    # 2. 加载配置（使用全局 ConfigManager 实例或创建新的）
     config_manager = get_config_manager()
     if config_manager is None:
         config_manager = ConfigManager()
@@ -334,18 +341,12 @@ async def process_document(file: UploadFile = File(...)):
     current_model = config_manager.get_current_model()
     model_config = config_manager.get_current_model_config()
 
-    # 检查模型配置是否有效
     if not model_config or not model_config.get("api_key"):
-        # 删除上传的原始文件
-        input_path.unlink()
-        error_msg = f"API 配置无效：模型 '{current_model}' 的 API Key 未配置。请先通过 Web 界面配置 API Key。"
-        log_error(error_msg)
-        raise HTTPException(
-            status_code=500,
-            detail="API 配置无效，请通过 Web 界面配置 API Key"
-        )
+        for _, p in input_paths:
+            if p.exists():
+                p.unlink()
+        raise HTTPException(status_code=500, detail="API 配置无效，请通过 Web 界面配置 API Key")
 
-    # 3. 初始化 AI 客户端
     try:
         client = OpenAI(
             api_key=model_config["api_key"],
@@ -353,75 +354,78 @@ async def process_document(file: UploadFile = File(...)):
         )
         model_name = model_config["model"]
     except Exception as e:
-        # 删除上传的原始文件
-        input_path.unlink()
-        error_msg = f"AI 服务初始化失败：{str(e)}。请检查 API 配置和网络连接。"
-        log_error(error_msg)
-        raise HTTPException(
-            status_code=500,
-            detail="AI 服务初始化失败，请检查 API 配置和网络连接"
-        )
+        for _, p in input_paths:
+            if p.exists():
+                p.unlink()
+        raise HTTPException(status_code=500, detail="AI 服务初始化失败，请检查 API 配置和网络连接")
 
-    # 4. 解析文档
-    parser = DocumentParser()
-    elements, paragraphs, _ = parser.parse(str(input_path))
+    all_elements = []
+    all_paragraphs = {}
+    all_document_info = {}
+    element_offset = 0
 
-    current_order = [elem[1] for elem in elements]
+    for safe_filename, input_path in input_paths:
+        parser = DocumentParser()
+        elements, paragraphs, _ = parser.parse(str(input_path))
 
-    # 提取文档信息
-    document_info = extract_document_info(file.filename, paragraphs, current_order)
-    log_info(f"文档识别：{document_info.get('type', '其他类型')} - {document_info.get('title', '未知')}")
-    
-    # 调试：打印文档信息
-    print(f"[DEBUG] 文档信息完整内容：{document_info}")
-    
-    # 创建英文版本的文档信息（用于响应头，避免编码问题）
-    doc_info_en = {
-        'type': document_info.get('type', 'Other'),
-        'title': document_info.get('title', 'Unknown'),
-        'section': document_info.get('section', '')
-    }
+        current_order = [elem[1] for elem in elements]
+        document_info = extract_document_info(safe_filename, paragraphs, current_order)
+        log_info(f"文档识别：{document_info.get('title', '未知')}")
 
-    # 5. 调用 AI 处理
+        if len(input_paths) > 1:
+            for key, value in paragraphs.items():
+                new_key = safe_filename + "::" + key
+                all_paragraphs[new_key] = value
+            for elem in elements:
+                all_elements.append((elem[0], safe_filename + "::" + elem[1], elem[2]))
+        else:
+            all_paragraphs.update(paragraphs)
+            all_elements.extend(elements)
+
+        all_document_info[safe_filename] = document_info
+
+    merged_order = [elem[1] for elem in all_elements]
+
+    primary_doc_info = list(all_document_info.values())[0] if all_document_info else {}
+    if len(all_document_info) > 1:
+        doc_names = list(all_document_info.keys())
+        primary_doc_info['title'] = f"合并文档（{', '.join(doc_names)}）"
+        primary_doc_info['source_count'] = len(all_document_info)
+
     ai_processor = AIProcessor(client, model_name)
-    polished_paragraphs, new_order, success = ai_processor.process_paragraphs(paragraphs, current_order, document_info)
+    polished_paragraphs, new_order, document_title, title_from_first_paragraph, success, generated_chart_titles, chart_title_paragraphs, generated_chapter_titles = ai_processor.process_paragraphs(
+        all_paragraphs, 
+        merged_order, 
+        primary_doc_info,
+        user_prompt,
+        doc_type
+    )
 
-    # 检查 AI 处理是否成功
     if not success:
-        # 删除上传的原始文件
-        input_path.unlink()
-        error_msg = "AI 处理失败，无法生成润色后的文档。请检查 API 配置和网络连接。"
-        log_error(error_msg)
-        raise HTTPException(
-            status_code=500,
-            detail=error_msg
-        )
+        for _, p in input_paths:
+            if p.exists():
+                p.unlink()
+        raise HTTPException(status_code=500, detail="AI 处理失败，无法生成润色后的文档")
 
-    # 6. 重建文档
-    builder = DocumentBuilder(elements, polished_paragraphs, new_order)
-    output_filename = f"processed_{safe_filename}"
+    builder = DocumentBuilder(all_elements, polished_paragraphs, new_order, generated_chart_titles, generated_chapter_titles, document_title, title_from_first_paragraph, chart_title_paragraphs)
+    first_filename = input_paths[0][0]
+    output_filename = f"processed_{first_filename}"
     output_path = upload_dir / output_filename
     builder.build(str(output_path))
 
-    # 7. 返回文件
-    log_success(f"文档处理完成：{file.filename}")
-    
-    # 返回文档信息给前端显示（直接使用 ASCII，避免编码问题）
+    log_success(f"文档处理完成：{len(files)} 个文件")
+
     from starlette.responses import Response
-    
-    # 读取文件内容
+
     with open(output_path, 'rb') as f:
         file_content = f.read()
-    
-    # 创建 Response 对象
+
     response = Response(
         content=file_content,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
-    
-    # 添加简单的文档类型信息（只包含 ASCII 字符）
-    doc_type_simple = document_info.get('type', 'Other')
-    # 将中文类型映射为简单标识
+
+    doc_type_simple = primary_doc_info.get('type', 'Other')
     type_mapping = {
         '技术方案/设计文档': 'Technical Design',
         '学术论文': 'Academic Paper',
@@ -431,10 +435,20 @@ async def process_document(file: UploadFile = File(...)):
         '其他类型': 'Other'
     }
     simple_type = type_mapping.get(doc_type_simple, 'Other')
-    
+
     response.headers["Content-Disposition"] = f'attachment; filename="processed_doc.docx"'
     response.headers["X-Doc-Type"] = simple_type
-    
+
+    # 清理临时文件
+    try:
+        for _, p in input_paths:
+            if p.exists():
+                p.unlink()
+        if output_path.exists():
+            output_path.unlink()
+    except Exception as e:
+        log_warning(f"清理临时文件失败: {e}")
+
     return response
 
 
@@ -625,3 +639,304 @@ async def switch_model(model_name: str):
         "api_url": model_config.get("base_url", "unknown"),
         "current_model": config_manager.get_current_model()
     }
+
+
+@router.get("/templates")
+async def get_templates():
+    """获取可用模板列表"""
+    from src.template_parser import WordTemplateParser
+    
+    templates = WordTemplateParser.list_saved_templates()
+    
+    return {
+        "templates": templates,
+        "count": len(templates)
+    }
+
+
+@router.get("/templates/{template_id}")
+async def get_template(template_id: str):
+    """获取指定模板详情"""
+    from src.template_parser import WordTemplateParser
+    
+    templates = WordTemplateParser.list_saved_templates()
+    template_info = next((t for t in templates if t["template_id"] == template_id), None)
+    
+    if not template_info:
+        raise HTTPException(status_code=404, detail=f"模板不存在：{template_id}")
+    
+    try:
+        template = WordTemplateParser.load_template_json(template_info["file_path"])
+        return {
+            "id": template_id,
+            "template": template.to_dict()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"模板加载失败：{str(e)}")
+
+
+@router.post("/templates/parse")
+async def parse_template(file: UploadFile = File(...)):
+    """
+    解析 Word 模板文档，生成模板 JSON
+    
+    Args:
+        file: 上传的模板文件
+    """
+    from src.template_parser import WordTemplateParser
+    
+    log_info(f"收到模板解析请求：{file.filename}")
+    
+    file_content = await file.read()
+    if len(file_content) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="文件大小不能超过 50MB")
+    
+    upload_dir = Path("./uploads")
+    upload_dir.mkdir(exist_ok=True)
+    
+    safe_filename = Path(file.filename).name
+    input_path = upload_dir / safe_filename
+    with open(input_path, "wb") as f:
+        f.write(file_content)
+    
+    try:
+        from src.config import ConfigManager
+        from openai import OpenAI
+        
+        config_manager = get_config_manager()
+        if config_manager is None:
+            config_manager = ConfigManager()
+        
+        model_config = config_manager.get_current_model_config()
+        ai_client = None
+        model_name = ""
+        
+        if model_config and model_config.get("api_key"):
+            try:
+                ai_client = OpenAI(
+                    api_key=model_config["api_key"],
+                    base_url=model_config["base_url"]
+                )
+                model_name = model_config["model"]
+                log_info(f"模板解析将使用 AI 推断章节描述，模型：{model_name}")
+            except Exception as e:
+                log_error(f"AI 客户端初始化失败：{str(e)}")
+        else:
+            log_info("未配置 AI，跳过章节描述推断")
+        
+        parser = WordTemplateParser()
+        template_def = parser.parse_template(str(input_path), ai_client=ai_client, model_name=model_name)
+        
+        templates_dir = WordTemplateParser.get_templates_dir()
+        output_path = templates_dir / f"{template_def.template_id}.json"
+        parser.save_template_json(str(output_path))
+        
+        log_success(f"模板解析完成：{template_def.name}")
+        
+        return {
+            "message": "模板解析成功",
+            "template": template_def.to_dict(),
+            "saved_path": str(output_path)
+        }
+        
+    except Exception as e:
+        log_error(f"模板解析失败：{str(e)}")
+        raise HTTPException(status_code=500, detail=f"模板解析失败：{str(e)}")
+
+
+@router.post("/process-with-template-generative")
+async def process_document_with_template_generative(
+    files: List[UploadFile] = File(...),
+    template_id: str = Form(None),
+    template_json: str = Form(None)
+):
+    """
+    使用模板处理文档（新策略：AI理解原文→按模板生成新内容）
+    
+    Args:
+        files: 上传的源文档列表
+        template_id: 模板 ID
+        template_json: 自定义模板 JSON 字符串（可选）
+    """
+    from src.config import ConfigManager
+    from src.parser import DocumentParser
+    from src.template_parser import WordTemplateParser
+    from src.ai_generative_processor import AIGenerativeTemplateProcessor
+    from src.ai_generative_renderer import AIGenerativeRenderer
+    from openai import OpenAI
+    
+    log_info(f"收到AI生成式模板处理请求：{len(files)} 个文件, 模板 ID: {template_id}")
+    
+    upload_dir = Path("./uploads")
+    upload_dir.mkdir(exist_ok=True)
+    
+    input_paths = []
+    for file in files:
+        file_content = await file.read()
+        if len(file_content) > 50 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail=f"文件 {file.filename} 大小不能超过 50MB")
+        safe_filename = Path(file.filename).name
+        input_path = upload_dir / safe_filename
+        with open(input_path, "wb") as f:
+            f.write(file_content)
+        input_paths.append((safe_filename, input_path))
+    
+    config_manager = get_config_manager()
+    if config_manager is None:
+        config_manager = ConfigManager()
+    
+    current_model = config_manager.get_current_model()
+    model_config = config_manager.get_current_model_config()
+    
+    if not model_config or not model_config.get("api_key"):
+        for _, p in input_paths:
+            if p.exists():
+                p.unlink()
+        raise HTTPException(status_code=500, detail="API 配置无效")
+    
+    try:
+        client = OpenAI(
+            api_key=model_config["api_key"],
+            base_url=model_config["base_url"]
+        )
+        model_name = model_config["model"]
+    except Exception as e:
+        for _, p in input_paths:
+            if p.exists():
+                p.unlink()
+        raise HTTPException(status_code=500, detail=f"AI 服务初始化失败：{str(e)}")
+    
+    try:
+        if template_json:
+            import json as json_module
+            template_data = json_module.loads(template_json)
+            from src.template import TemplateDefinition
+            template = TemplateDefinition.from_dict(template_data)
+            log_info(f"使用自定义模板：{template.name}")
+        elif template_id:
+            templates = WordTemplateParser.list_saved_templates()
+            template_info = next((t for t in templates if t["template_id"] == template_id), None)
+            
+            if not template_info:
+                for _, p in input_paths:
+                    if p.exists():
+                        p.unlink()
+                raise HTTPException(status_code=404, detail=f"模板不存在：{template_id}")
+            
+            template = WordTemplateParser.load_template_json(template_info["file_path"])
+            log_info(f"使用模板：{template.name}")
+        else:
+            for _, p in input_paths:
+                if p.exists():
+                    p.unlink()
+            raise HTTPException(status_code=400, detail="未指定模板")
+    except HTTPException:
+        raise
+    except Exception as e:
+        for _, p in input_paths:
+            if p.exists():
+                p.unlink()
+        raise HTTPException(status_code=500, detail=f"模板加载失败：{str(e)}")
+    
+    all_elements = []
+    all_paragraphs = {}
+    all_document_info = {}
+    original_docs = []
+    
+    # 统计图表数量
+    total_tables = 0
+    total_images = 0
+
+    for safe_filename, input_path in input_paths:
+        parser = DocumentParser()
+        elements, paragraphs, original_doc = parser.parse(str(input_path))
+        
+        if original_doc:
+            original_docs.append(original_doc)
+            # 统计该文档的图表数量
+            total_tables += len(original_doc.tables)
+            for rel in original_doc.part.rels.values():
+                if "image" in rel.target_ref:
+                    total_images += 1
+
+        if len(input_paths) > 1:
+            for key, value in paragraphs.items():
+                new_key = safe_filename + "::" + key
+                all_paragraphs[new_key] = value
+            for elem in elements:
+                all_elements.append((elem[0], safe_filename + "::" + elem[1], elem[2]))
+        else:
+            all_paragraphs.update(paragraphs)
+            all_elements.extend(elements)
+
+        document_info = extract_document_info(safe_filename, paragraphs, [elem[1] for elem in elements])
+        all_document_info[safe_filename] = document_info
+    
+    source_content = {
+        'elements': all_elements,
+        'paragraphs': all_paragraphs
+    }
+    
+    primary_doc_info = list(all_document_info.values())[0] if all_document_info else {}
+    if len(all_document_info) > 1:
+        doc_names = list(all_document_info.keys())
+        primary_doc_info['title'] = f"合并文档（{', '.join(doc_names)}）"
+        primary_doc_info['source_count'] = len(all_document_info)
+    
+    # 添加图表统计信息
+    primary_doc_info['table_count'] = total_tables
+    primary_doc_info['image_count'] = total_images
+    
+    log_info(f"源文档统计：{total_tables} 个表格, {total_images} 个图片")
+    
+    # 使用新的AI生成式处理器
+    ai_processor = AIGenerativeTemplateProcessor(client, model_name)
+    generated_content = ai_processor.process_with_template(
+        source_content=source_content,
+        template=template,
+        source_docs_info=primary_doc_info
+    )
+    
+    if not generated_content:
+        for _, p in input_paths:
+            if p.exists():
+                p.unlink()
+        raise HTTPException(status_code=500, detail="AI 生成失败")
+    
+    log_info(f"AI 生成内容成功，共 {len(generated_content['structure'])} 个元素")
+    
+    try:
+        # 使用新的渲染器
+        renderer = AIGenerativeRenderer()
+        
+        first_filename = input_paths[0][0]
+        output_filename = f"generative_{first_filename}"
+        output_path = upload_dir / output_filename
+        
+        renderer.render(generated_content, str(output_path))
+        
+        log_success(f"AI生成式模板处理完成：{len(files)} 个文件")
+        
+        from starlette.responses import Response
+        
+        with open(output_path, 'rb') as f:
+            file_content = f.read()
+        
+        response = Response(
+            content=file_content,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        
+        # 使用 URL 编码处理中文文件名
+        encoded_filename = quote(output_filename)
+        response.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded_filename}"
+        response.headers["X-Template-Name"] = quote(template.name)
+        response.headers["X-Content-Elements"] = str(len(generated_content['structure']))
+        
+        return response
+        
+    except Exception as e:
+        for _, p in input_paths:
+            if p.exists():
+                p.unlink()
+        raise HTTPException(status_code=500, detail=f"文档渲染失败：{str(e)}")

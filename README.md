@@ -1,83 +1,48 @@
 # WordAiKit
 
-<p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
-  <img src="https://img.shields.io/badge/python-3.8+-green.svg" alt="Python">
-  <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
-</p>
+这是一个轻量级的Word文档智能处理工具，通过调用大语言模型 API 对 Word 文档进行智能润色、标题生成、章节重组等处理，帮助用户快速提升文档质量。
 
-Word 文档智能处理工具，支持文字润色、保留图片/表格/公式等功能。通过调用大语言模型 API 对 Word 文档进行智能处理，帮助用户快速提升文档质量。
+## 主要功能
 
-## ✨ 功能特性
+- 智能文字润色：修正语法、错别字，提升语句连贯性
+- 文档标题处理：自动识别或生成文档主标题、章节标题、图表标题
+- 格式保留：完整保留原文档中的图片、表格、公式
+- 风格适配：支持技术方案、学术论文、测试报告等文档类型
+- 自定义提示词：用户可指定润色风格、标题要求等
+- 多模型支持：支持 DeepSeek、阿里云通义、Kimi 等云端模型，以及 Ollama、LM Studio 等本地模型
+- Web 界面：简洁易用的浏览器操作界面
 
-- 🔤 **智能润色** - 修正语法、错别字，提升语句连贯性
-- 🖼️ **格式保留** - 完整保留原文档中的图片、表格、公式
-- 📝 **风格识别** - 自动识别并匹配文档风格（技术方案、学术论文、测试报告等）
-- 🤖 **多模型支持** - 支持 DeepSeek、阿里云通义、Kimi 等多种 AI 模型
-- 🌐 **Web 界面** - 简洁易用的 Web 操作界面
+## 软件亮点
 
-## 🛠️ 技术栈
+- 智能识别文档结构，自动处理标题层级
+- 图表标题智能提炼，根据上下文生成准确描述
+- 段落格式统一规范（首行缩进2字符，1.5倍行距）
+- 支持多文档合并处理
+- 本地部署，数据安全可控
 
-- **后端**: Python + FastAPI + Uvicorn
-- **AI**: OpenAI API (兼容多家大模型)
-- **文档处理**: python-docx
-- **前端**: HTML + CSS + JavaScript
-
-## 📁 项目结构
-
-```
-WordAiKit-V1.0.0/
-├── main.py              # 程序入口
-├── requirements.txt     # 依赖配置
-├── api/
-│   ├── __init__.py
-│   └── routes.py        # API 路由
-├── src/
-│   ├── __init__.py
-│   ├── ai_processor.py  # AI 处理模块
-│   ├── builder.py       # 文档构建模块
-│   ├── cache_manager.py # 缓存管理
-│   ├── config.py        # 配置管理
-│   ├── constants.py     # 常量定义
-│   ├── logger.py        # 日志模块
-│   ├── parser.py        # 文档解析模块
-│   └── storage.py       # 存储模块
-└── static/
-    ├── css/
-    │   └── style.css
-    ├── js/
-    │   └── app.js
-    └── index.html       # 前端界面
-```
-
-## 🚀 快速开始
+## 安装与使用
 
 ### 环境要求
 
 - Python 3.8+
 - 操作系统：Windows / Linux / macOS
 
-### 创建虚拟环境（推荐）
+### 方式一：使用 Conda 环境
 
-建议使用虚拟环境安装依赖，避免与系统 Python 环境冲突：
+```bash
+conda create -n wordaikit python=3.10
+conda activate wordaikit
+pip install -r requirements.txt
+```
 
-**Windows:**
+### 方式二：使用 venv 虚拟环境
+
 ```bash
 python -m venv venv
+# Windows
 venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-**Linux/macOS:**
-```bash
-python3 -m venv venv
+# Linux/macOS
 source venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 直接安装（不推荐）
-
-```bash
 pip install -r requirements.txt
 ```
 
@@ -87,66 +52,24 @@ pip install -r requirements.txt
 python main.py
 ```
 
-程序启动后会自动打开浏览器访问 `http://localhost:8000`
+程序启动后会自动打开浏览器访问 <http://localhost:8000>
 
-## 📖 使用说明
-
-### 1. 配置 API Key
-
-首次使用需要配置 AI 服务的 API Key：
-
-1. 点击界面上的「⚙️ 在线配置」按钮
-2. 选择要使用的 AI 模型
-3. 输入对应的 API Key
-4. 点击「🧪 测试配置」验证
-5. 点击「💾 保存配置」
-
-**获取 API Key：**
-| 服务商 | 获取地址 |
-|--------|---------|
-| DeepSeek | https://platform.deepseek.com |
-| 阿里云通义 | https://dashscope.console.aliyun.com |
-| Kimi | https://platform.moonshot.cn |
-
-### 2. 处理文档
-
-1. 上传 Word 文档（.docx 格式）
-2. 点击「🚀 开始处理」
-3. 下载处理后的文档
-
-**处理限制：**
-- 推荐单次处理：≤ 50,000 中文字符（约 25-30 页）
-- 最大支持：100,000 中文字符
-
-## ⚙️ 配置文件
-
-- **配置文件位置**: 默认保存在用户文档目录
-- **文件名**: `.wordaikit_config.json`
-- **日志文件**: `logs/wordaikit.log`
-
-## ⚠️ 注意事项
-
-1. **API Key 安全**: 请勿将配置文件分享给他人
-2. **正确退出**: 使用 `Ctrl + C` 退出程序，确保临时文件被正确清理
-3. **网络要求**: 需要稳定的网络连接访问 AI API 服务
-
-## 📄 许可证
-
-本项目采用 MIT 许可证
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request
-
-## 😉 QQ交流群
-
-WordAiKit交流群：1081856288
+## 特别说明
+- 出于安全考虑，云端API KEY 保存在本地自定义路径。请勿泄露给他人。
+- 目前支持的本地大模型工具有Ollama、LM Studio，使用时请参考其官方文档。该功能尚未充分测试，感兴趣的话建议在本地环境先验证。后续会更新相关说明。
 
 
+### 获取 API Key
 
+| 服务商      | 获取地址                                   |
+| -------- | -------------------------------------- |
+| DeepSeek | <https://platform.deepseek.com>        |
+| 阿里云通义    | <https://dashscope.console.aliyun.com> |
+| Kimi     | <https://platform.moonshot.cn>         |
 
----
+## 许可与联系
 
-<p align="center">
-  如果这个项目对你有帮助，请给一个 ⭐️ Star 支持一下！
-</p>
+- 许可证：MIT License
+- QQ交流群：1081856288
+- 邮箱：bggcs111@163.com
+

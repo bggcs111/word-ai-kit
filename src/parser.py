@@ -76,7 +76,8 @@ class DocumentParser:
         
         # 添加段落文字（包含行内公式的段落）
         # 注意：独立公式段落不添加为段落元素，只作为公式元素添加
-        if (text or img_data_list) or has_inline_formula:
+        # 注意：纯图片段落（只有图片，没有文字和行内公式）也不添加为段落元素
+        if (text and text.strip()) or has_inline_formula:
             pid = f"P{self.p_count}"
             
             # 对于行内公式，记录哪些 run 包含公式
@@ -89,12 +90,6 @@ class DocumentParser:
             self.paragraphs[pid] = para_data
             self.elements.append(('paragraph', pid, para_data))
             self.p_count += 1
-            
-            # 调试信息
-            if has_formula:
-                print(f"段落 {pid} 检测到公式：{len(all_runs_with_formulas)} 个 runs, {len(formula_runs_list)} 个公式 runs, {len(omath_elements)} 个 oMath 元素，独立公式={not has_inline_formula}")
-                if formula_run_indices:
-                    print(f"  公式 run 索引：{formula_run_indices}")
         
         # 添加图片（作为独立元素，紧跟在相关段落后）
         for img_data in img_data_list:
@@ -109,7 +104,6 @@ class DocumentParser:
                 fid = f"F{self.f_count}"
                 self.elements.append(('formula', fid, formula_run))
                 self.f_count += 1
-                print(f"添加独立公式：{fid}")
     
     def _parse_table(self, table_element, doc: Document):
         """解析表格"""
@@ -129,7 +123,6 @@ class DocumentParser:
             row_data = [cell.text.strip() for cell in row.cells]
             table_data.append(row_data)
         self.elements.append(('table', tid, table_data))
-        print(f"添加表格：{tid} (在当前位置)")
         self.t_count += 1
     
     def _extract_images(self, para, doc: Document) -> List[bytes]:
@@ -198,7 +191,6 @@ class DocumentParser:
                 else:
                     # 公式在段落级别，保存段落对象
                     formula_runs_list = [para]
-                print(f"  -> 独立公式：{len(all_omath)} 个 oMath 元素，{len(formula_runs_list)} 个 runs/para")
             else:
                 # 行内公式 - 文字和公式混合
                 has_inline_formula = True
@@ -238,8 +230,6 @@ class DocumentParser:
                     seen.add(elem_id)
             omath_elements = unique_omath
             
-            print(f"  段落 XML 结构：共 {len(children)} 个子元素")
-            
             # 对于每个 oMath 元素，找到它前面的 run 数量
             for omath_idx, omath in enumerate(omath_elements):
                 run_count_before = 0
@@ -258,18 +248,15 @@ class DocumentParser:
                 if run_count_before >= total_runs:
                     # oMath 在最后一个 run 之后
                     formula_run_indices.append(total_runs - 1)
-                    print(f"    oMath {omath_idx + 1} 位置：在最后一个 run（索引 {total_runs - 1}）之后")
                 elif run_count_before == 0:
                     # oMath 在第一个 run 之前
                     formula_run_indices.append(-1)
-                    print(f"    oMath {omath_idx + 1} 位置：在第一个 run 之前")
                 else:
                     # oMath 在 run_count_before-1 索引的 run 之后
                     formula_run_indices.append(run_count_before - 1)
-                    print(f"    oMath {omath_idx + 1} 位置：在 run {run_count_before - 1} 之后（共 {total_runs} 个 runs）")
             
         except Exception as e:
-            print(f"  获取公式 run 索引失败：{e}")
+            pass
             import traceback
             traceback.print_exc()
         

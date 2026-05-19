@@ -22,6 +22,16 @@ MODEL_CONFIGS = {
         "api_key": "",
         "base_url": "https://api.moonshot.cn/v1",
         "model": "kimi-k2.5"
+    },
+    "ollama": {
+        "api_key": "ollama",
+        "base_url": "http://localhost:11434/v1",
+        "model": "qwen2.5:7b"
+    },
+    "lmstudio": {
+        "api_key": "lmstudio",
+        "base_url": "http://localhost:1234/v1",
+        "model": "local-model"
     }
 }
 
@@ -50,8 +60,8 @@ class ConfigManager:
             from src.storage import ConfigStorage
             self.storage = ConfigStorage(storage_path)
             self._load_from_storage()
-        except Exception as e:
-            print(f"使用存储模块失败：{e}")
+        except Exception:
+            pass
 
         # 设置默认模型
         self.current_model = "deepseek"
@@ -111,7 +121,6 @@ class ConfigManager:
             bool: 保存是否成功
         """
         if not self.storage:
-            print("未启用存储模块，无法保存配置")
             return False
 
         success = self.storage.save_model_config(model_name, api_key, base_url, model)
@@ -121,7 +130,6 @@ class ConfigManager:
             MODEL_CONFIGS[model_name]['base_url'] = base_url
             MODEL_CONFIGS[model_name]['model'] = model
             self._build_models_config()
-            print(f"配置已保存：{model_name}")
         return success
 
     def switch_model(self, model_name: str, persist: bool = False) -> bool:
@@ -144,7 +152,6 @@ class ConfigManager:
             self.storage.set_current_model(model_name)
 
         model_info = self.models_config.get(model_name, {})
-        print(f"模型已切换到：{model_name} -> {model_info.get('model', 'unknown')}")
         return True
 
     def get_storage_status(self) -> bool:
@@ -168,24 +175,13 @@ class ConfigManager:
             bool: 是否成功
         """
         if not self.storage:
-            print("未启用存储模块，无法更改路径")
             return False
 
         try:
             success = self.storage.change_storage_path(new_path)
             if success:
-                print(f"配置文件路径已更改：{new_path}")
                 return True
             else:
-                print("更改配置文件路径失败")
                 return False
-        except ValueError as e:
-            # 确保异常消息是字符串，而不是 Path 对象
-            error_msg = str(e)
-            print(f"更改配置文件路径失败：{error_msg}")
-            return False
-        except Exception as e:
-            # 捕获所有其他异常
-            error_msg = str(e)
-            print(f"更改配置文件路径异常：{error_msg}")
+        except (ValueError, Exception):
             return False

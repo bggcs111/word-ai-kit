@@ -259,9 +259,3 @@ def clear_cache_on_exit(keep_recent_uploads: int = 0):
     """
     manager = get_cache_manager()
     result = manager.clear_all_cache(keep_recent_uploads=keep_recent_uploads)
-    
-    print(f"\n🧹 缓存清理完成:")
-    print(f"   上传文件: {result['uploads_cleared']} 个")
-    print(f"   旧日志: {result['logs_cleared']} 个")
-    print(f"   临时文件: {result['temp_cleared']} 个")
-    print(f"   总计: {result['total_cleared']} 个文件\n")

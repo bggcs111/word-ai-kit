@@ -1,74 +1,66 @@
 // WordAiKit - Main JavaScript Application
 
 // Global Variables
-let selectedFile = null;
+let selectedFiles = [];
 let resultFileName = null;
 let currentTab = 'deepseek';
+let selectedTemplateId = null;
+let customTemplateJson = null;
+let processMode = 'normal'; // 'normal' or 'template'
 
 // Initialize Application
 window.addEventListener('DOMContentLoaded', () => {
     checkServiceStatus();
     loadModels();
     loadConfigStatus();
+    loadTemplates();
     setupEventListeners();
 });
 
 // Event Listeners Setup
 function setupEventListeners() {
-    // File input listener
     const fileInput = document.getElementById('fileInput');
     fileInput.addEventListener('change', handleFileSelect);
     
-    // Drag and drop listeners - setup on the drop zone only
     const dropZone = document.getElementById('fileLabel');
     
-    // Prevent default drag behaviors on drop zone
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropZone.addEventListener(eventName, preventDefaults, false);
     });
     
-    // Prevent default on document to stop browser from opening file
     ['dragover', 'drop'].forEach(eventName => {
         document.addEventListener(eventName, preventDefaults, false);
     });
     
-    // Highlight drop area when dragging over
     dropZone.addEventListener('dragenter', highlight, false);
     dropZone.addEventListener('dragover', highlight, false);
     dropZone.addEventListener('dragleave', unhighlight, false);
     dropZone.addEventListener('drop', handleDrop, false);
     
-    // Model selector listener
     document.getElementById('modelSelect').addEventListener('change', handleModelChange);
     
-    // Modal close on outside click
     window.onclick = handleModalOutsideClick;
 }
 
-// Prevent default drag behaviors - VERY IMPORTANT to stop browser from opening file
 function preventDefaults(e) {
     e.preventDefault();
     e.stopPropagation();
     return false;
 }
 
-// Highlight drop area
 function highlight(e) {
     e.preventDefault();
     e.stopPropagation();
     document.getElementById('fileLabel').classList.add('drag-over');
 }
 
-// Remove highlight
 function unhighlight(e) {
     e.preventDefault();
     e.stopPropagation();
     document.getElementById('fileLabel').classList.remove('drag-over');
 }
 
-// Handle dropped files
 function handleDrop(e) {
-    // MUST prevent default here!
     e.preventDefault();
     e.stopPropagation();
     
@@ -78,33 +70,36 @@ function handleDrop(e) {
     const files = dt.files;
     
     if (files.length > 0) {
-        const file = files[0];
-        // Check if file is .docx
-        if (file.name.endsWith('.docx')) {
-            selectedFile = file;
-            updateFileLabel(file.name);
+        const validFiles = [];
+        for (const file of files) {
+            if (file.name.endsWith('.docx')) {
+                validFiles.push(file);
+            }
+        }
+        
+        if (validFiles.length > 0) {
+            selectedFiles = validFiles;
+            updateFileList();
             document.getElementById('processBtn').disabled = false;
-            addLog(`📄 通过拖拽选择文件：${file.name}`);
+            addLog(`📄 通过拖拽选择 ${validFiles.length} 个文件`);
         } else {
             showAlert('请上传 .docx 格式的 Word 文档', 'error');
-            addLog(`❌ 不支持的文件格式：${file.name}`);
+            addLog(`❌ 不支持的文件格式`);
         }
     }
     
     return false;
 }
 
-// File Selection Handler
 function handleFileSelect(e) {
-    const file = e.target.files[0];
-    if (file) {
-        selectedFile = file;
-        updateFileLabel(file.name);
+    const files = e.target.files;
+    if (files.length > 0) {
+        selectedFiles = Array.from(files);
+        updateFileList();
         document.getElementById('processBtn').disabled = false;
     }
 }
 
-// Model Change Handler
 async function handleModelChange(e) {
     const modelName = e.target.value;
     if (modelName) {
@@ -112,11 +107,15 @@ async function handleModelChange(e) {
     }
 }
 
-// Modal Outside Click Handler
 function handleModalOutsideClick(event) {
     const modal = document.getElementById('configModal');
     if (event.target === modal) {
         closeConfigModal();
+    }
+    
+    const templateModal = document.getElementById('templateUploadModal');
+    if (templateModal && event.target === templateModal) {
+        closeTemplateUploadModal();
     }
 }
 
@@ -185,7 +184,7 @@ async function switchModel(modelName) {
 
 // Process Document
 async function processDocument() {
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
         showAlert('请先选择要处理的文档', 'warning');
         return;
     }
@@ -203,10 +202,12 @@ async function processDocument() {
         progressContainer.classList.add('show');
         progressFill.style.width = '30%';
         progressText.textContent = '正在上传文档...';
-        addLog('📤 开始上传文档：' + selectedFile.name);
+        addLog(`📤 开始上传 ${selectedFiles.length} 个文档`);
 
         const formData = new FormData();
-        formData.append('file', selectedFile);
+        for (const file of selectedFiles) {
+            formData.append('files', file);
+        }
 
         progressFill.style.width = '50%';
         progressText.textContent = '正在处理文档...';
@@ -227,16 +228,12 @@ async function processDocument() {
         }
 
         const blob = await response.blob();
-        resultFileName = `processed_${selectedFile.name}`;
+        resultFileName = `processed_${selectedFiles[0].name}`;
         window.resultBlob = blob;
         
-        // 获取文档类型并显示（简单的 ASCII 标识）
         const docType = response.headers.get('X-Doc-Type');
         
         if (docType) {
-            console.log('文档类型:', docType);
-            
-            // 文档类型映射（英文标识 -> 中文显示）
             const typeMap = {
                 'Technical Design': '📊 文档类型：技术方案/设计文档',
                 'Academic Paper': '📊 文档类型：学术论文',
@@ -255,7 +252,8 @@ async function processDocument() {
         addLog('✅ 文档处理成功：' + resultFileName);
         addLog('💾 结果已准备下载');
         
-        showResult(selectedFile.name, resultFileName);
+        const fileNames = selectedFiles.map(f => f.name).join(', ');
+        showResult(fileNames, resultFileName);
 
     } catch (error) {
         const errorMsg = `处理失败：${error.message}`;
@@ -303,15 +301,39 @@ function downloadResult() {
     showAlert('下载已开始', 'success');
 }
 
-// Update File Label
-function updateFileLabel(fileName) {
+// Update File List
+function updateFileList() {
     const label = document.getElementById('fileLabel');
+    const fileListDiv = document.getElementById('fileList');
+    
+    if (selectedFiles.length === 0) {
+        label.classList.remove('has-file');
+        label.innerHTML = `
+            <div class="file-icon">📄</div>
+            <div class="file-name">点击上传文档</div>
+            <div class="file-hint">支持 .docx 格式，可同时选择多个文档</div>
+        `;
+        fileListDiv.style.display = 'none';
+        return;
+    }
+    
     label.classList.add('has-file');
     label.innerHTML = `
         <div class="file-icon">📄</div>
-        <div class="file-name">${fileName}</div>
-        <div class="file-hint">文件大小：${formatFileSize(selectedFile.size)}</div>
+        <div class="file-name">已选择 ${selectedFiles.length} 个文档</div>
+        <div class="file-hint">点击可重新选择</div>
     `;
+    
+    fileListDiv.style.display = 'block';
+    let html = '<div style="background: #f8f9fa; border-radius: 5px; padding: 8px; font-size: 13px;">';
+    for (let i = 0; i < selectedFiles.length; i++) {
+        html += `<div style="padding: 3px 0; display: flex; justify-content: space-between; align-items: center;">
+            <span>📄 ${selectedFiles[i].name}</span>
+            <span style="color: #6c757d; font-size: 12px;">${formatFileSize(selectedFiles[i].size)}</span>
+        </div>`;
+    }
+    html += '</div>';
+    fileListDiv.innerHTML = html;
 }
 
 // Format File Size
@@ -604,4 +626,393 @@ async function testCurrentConfig() {
         showTestResult('error', '❌ 配置测试失败', `网络请求异常，请检查：\n1. 后端服务是否正常运行\n2. 网络连接是否正常\n\n详细错误：${error.message}`);
         addLog(`❌ 配置测试失败：${error.message}`);
     }
+}
+
+// ========== 模板处理相关功能 ==========
+
+// 加载模板列表
+async function loadTemplates() {
+    try {
+        const response = await fetch('/api/templates');
+        const data = await response.json();
+        
+        const select = document.getElementById('templateSelect');
+        
+        if (data.templates && data.templates.length > 0) {
+            select.innerHTML = '<option value="">-- 请选择模板 --</option>';
+            
+            data.templates.forEach(template => {
+                const option = document.createElement('option');
+                option.value = template.template_id;
+                option.textContent = `${template.name} (${template.structure_count} 个元素, ${template.styles_count} 个样式)`;
+                select.appendChild(option);
+            });
+            
+            select.addEventListener('change', (e) => {
+                selectedTemplateId = e.target.value;
+                customTemplateJson = null;
+                if (selectedTemplateId) {
+                    addLog(`📋 已选择模板：${selectedTemplateId}`);
+                    showTemplateInfo(selectedTemplateId);
+                }
+            });
+            
+            addLog(`📋 已加载 ${data.templates.length} 个模板`);
+        } else {
+            select.innerHTML = '<option value="">-- 暂无模板，请先上传 --</option>';
+        }
+    } catch (error) {
+        console.error('加载模板列表失败:', error);
+        addLog(`❌ 加载模板列表失败：${error.message}`);
+    }
+}
+
+// 显示模板信息
+async function showTemplateInfo(templateId) {
+    try {
+        const response = await fetch(`/api/templates/${templateId}`);
+        const data = await response.json();
+        
+        if (data.template) {
+            const template = data.template;
+            const infoDiv = document.getElementById('templateInfo');
+            infoDiv.style.display = 'block';
+            infoDiv.innerHTML = `
+                <strong>${template.name}</strong><br>
+                ${template.description || '无描述'}<br>
+                <small>样式数：${Object.keys(template.styles || {}).length} | 
+                       元素数：${(template.structure || []).length}</small>
+            `;
+        }
+    } catch (error) {
+        console.error('获取模板详情失败:', error);
+    }
+}
+
+// 切换处理模式
+function toggleProcessMode() {
+    const modeRadios = document.getElementsByName('processMode');
+    for (const radio of modeRadios) {
+        if (radio.checked) {
+            processMode = radio.value;
+            break;
+        }
+    }
+    
+    const templateSelection = document.getElementById('templateSelection');
+    const docTypeSection = document.getElementById('docTypeSection');
+    const userPromptSection = document.getElementById('userPromptSection');
+    if (processMode === 'template') {
+        templateSelection.style.display = 'block';
+        docTypeSection.style.display = 'none';
+        userPromptSection.style.display = 'none';
+        addLog('📋 已切换到模板输出模式');
+    } else {
+        templateSelection.style.display = 'none';
+        docTypeSection.style.display = 'block';
+        userPromptSection.style.display = 'block';
+        addLog('📝 已切换到普通润色模式');
+    }
+}
+
+// 文档类型选择变化
+document.addEventListener('DOMContentLoaded', () => {
+    const docTypeSelect = document.getElementById('docTypeSelect');
+    const customDocTypeDiv = document.getElementById('customDocTypeDiv');
+    
+    if (docTypeSelect) {
+        docTypeSelect.addEventListener('change', () => {
+            if (docTypeSelect.value === 'custom') {
+                customDocTypeDiv.style.display = 'block';
+            } else {
+                customDocTypeDiv.style.display = 'none';
+            }
+        });
+    }
+});
+
+// 打开模板上传模态框
+function openTemplateUploadModal() {
+    document.getElementById('templateUploadModal').style.display = 'flex';
+    document.getElementById('templateUploadProgress').style.display = 'none';
+    document.getElementById('templateUploadResult').style.display = 'none';
+    document.getElementById('templateDocInput').value = '';
+}
+
+// 关闭模板上传模态框
+function closeTemplateUploadModal() {
+    document.getElementById('templateUploadModal').style.display = 'none';
+}
+
+// 上传模板文档
+async function uploadTemplateDocument() {
+    const fileInput = document.getElementById('templateDocInput');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        showAlert('请先选择模板文档', 'warning');
+        return;
+    }
+    
+    if (!file.name.endsWith('.docx')) {
+        showAlert('请上传 .docx 格式的 Word 文档', 'error');
+        return;
+    }
+    
+    const progressDiv = document.getElementById('templateUploadProgress');
+    const progressFill = document.getElementById('templateProgressFill');
+    const progressText = document.getElementById('templateProgressText');
+    const resultDiv = document.getElementById('templateUploadResult');
+    
+    progressDiv.style.display = 'block';
+    resultDiv.style.display = 'none';
+    progressFill.style.width = '30%';
+    progressText.textContent = '正在上传模板文档...';
+    
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        progressFill.style.width = '50%';
+        progressText.textContent = '正在解析模板...';
+        
+        const response = await fetch('/api/templates/parse', {
+            method: 'POST',
+            body: formData
+        });
+        
+        progressFill.style.width = '80%';
+        progressText.textContent = '正在保存模板...';
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || '模板解析失败');
+        }
+        
+        const data = await response.json();
+        
+        progressFill.style.width = '100%';
+        progressText.textContent = '模板解析完成！';
+        
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div style="color: #28a745; font-weight: bold;">✅ 模板解析成功</div>
+            <div style="margin-top: 10px;">
+                <strong>模板名称：</strong>${data.template.name}<br>
+                <strong>样式数量：</strong>${Object.keys(data.template.styles || {}).length}<br>
+                <strong>元素数量：</strong>${(data.template.structure || []).length}<br>
+                <strong>保存路径：</strong>${data.saved_path}
+            </div>
+        `;
+        
+        addLog(`✅ 模板解析成功：${data.template.name}`);
+        
+        // 刷新模板列表
+        setTimeout(() => {
+            loadTemplates();
+            closeTemplateUploadModal();
+            showAlert('模板解析成功，已添加到模板列表', 'success');
+        }, 1500);
+        
+    } catch (error) {
+        progressText.textContent = '解析失败';
+        progressFill.style.width = '100%';
+        progressFill.style.background = '#dc3545';
+        
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `<div style="color: #dc3545;">❌ ${error.message}</div>`;
+        
+        addLog(`❌ 模板解析失败：${error.message}`);
+        showAlert(`模板解析失败：${error.message}`, 'error');
+    }
+}
+
+// 处理文档（支持模板模式）
+async function processDocument() {
+    if (selectedFiles.length === 0) {
+        showAlert('请先选择要处理的文档', 'warning');
+        return;
+    }
+
+    clearPreviousState();
+
+    const processBtn = document.getElementById('processBtn');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+
+    try {
+        processBtn.disabled = true;
+        
+        if (processMode === 'template') {
+            processBtn.innerHTML = '<span class="loading-spinner"></span> 模板处理中...';
+        } else {
+            processBtn.innerHTML = '<span class="loading-spinner"></span> 处理中...';
+        }
+        
+        progressContainer.classList.add('show');
+        progressFill.style.width = '30%';
+        progressText.textContent = '正在上传文档...';
+        addLog(`📤 开始上传 ${selectedFiles.length} 个文档`);
+
+        const formData = new FormData();
+        for (const file of selectedFiles) {
+            formData.append('files', file);
+        }
+
+        // 普通模式下传递用户自定义提示词和文档类型
+        if (processMode === 'normal') {
+            // 文档类型处理
+            const docTypeSelect = document.getElementById('docTypeSelect');
+            let docType = docTypeSelect ? docTypeSelect.value : '';
+            if (docType === 'custom') {
+                const customDocType = document.getElementById('customDocType').value.trim();
+                if (customDocType) {
+                    docType = customDocType;
+                    addLog(`📚 已使用自定义文档类型：${docType}`);
+                } else {
+                    docType = '';
+                    addLog('📚 文档类型未设置，将保持原文风格');
+                }
+            } else if (docType) {
+                addLog(`📚 已选择文档类型：${docType}`);
+            } else {
+                addLog('📚 文档类型未设置，将保持原文风格');
+            }
+            
+            if (docType) {
+                formData.append('doc_type', docType);
+            }
+            
+            // 用户自定义提示词（可以包含任何要求，如风格、章节标题、内容要求等）
+            const userPrompt = document.getElementById('userPrompt').value.trim();
+            if (userPrompt) {
+                formData.append('user_prompt', userPrompt);
+                addLog('💡 已使用用户自定义要求，AI 会智能识别并执行');
+            } else {
+                addLog('📝 将使用默认自动润色');
+            }
+        }
+
+        if (processMode === 'template') {
+            progressFill.style.width = '40%';
+            progressText.textContent = '准备模板参数...';
+            
+            if (!selectedTemplateId && !customTemplateJson) {
+                throw new Error('请先选择模板或上传自定义模板文件');
+            }
+            
+            if (selectedTemplateId) {
+                formData.append('template_id', selectedTemplateId);
+                addLog(`📋 使用模板：${selectedTemplateId}`);
+            }
+            
+            if (customTemplateJson) {
+                formData.append('template_json', JSON.stringify(customTemplateJson));
+                addLog(`📋 使用自定义模板`);
+            }
+        }
+
+        progressFill.style.width = '50%';
+        progressText.textContent = '正在处理文档...';
+        addLog('🔄 正在处理文档...');
+        
+        // 根据处理模式选择API路由
+        let apiUrl;
+        if (processMode === 'template') {
+            apiUrl = '/api/process-with-template-generative';
+            addLog('🚀 使用AI生成式策略');
+        } else {
+            apiUrl = '/api/process';
+        }
+        
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            body: formData
+        });
+
+        progressFill.style.width = '80%';
+        progressText.textContent = '正在生成结果...';
+        addLog('📝 正在生成结果...');
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || '处理失败');
+        }
+
+        const blob = await response.blob();
+        resultFileName = processMode === 'template' 
+            ? `template_${selectedFiles[0].name}` 
+            : `processed_${selectedFiles[0].name}`;
+        window.resultBlob = blob;
+        
+        const docType = response.headers.get('X-Doc-Type');
+        const templateName = response.headers.get('X-Template-Name');
+        
+        if (templateName) {
+            addLog(`📋 使用模板：${templateName}`);
+        }
+        
+        if (docType) {
+            const typeMap = {
+                'Technical Design': '📊 文档类型：技术方案/设计文档',
+                'Academic Paper': '📊 文档类型：学术论文',
+                'Test Report': '📊 文档类型：测试报告',
+                'Survey Report': '📊 文档类型：调研报告',
+                'Project Document': '📊 文档类型：项目文档',
+                'Other': '📊 文档类型：其他类型'
+            };
+            
+            const typeText = typeMap[docType] || `📊 文档类型：${docType}`;
+            addLog(typeText);
+        }
+        
+        progressFill.style.width = '100%';
+        progressText.textContent = processMode === 'template' ? '模板处理完成！' : '处理完成！';
+        addLog('✅ 文档处理成功：' + resultFileName);
+        addLog('💾 结果已准备下载');
+        
+        const fileNames = selectedFiles.map(f => f.name).join(', ');
+        showResult(fileNames, resultFileName);
+
+    } catch (error) {
+        const errorMsg = `处理失败：${error.message}`;
+        addLog('❌ ' + errorMsg);
+        showAlert(errorMsg, 'error');
+        progressContainer.classList.remove('show');
+    } finally {
+        processBtn.disabled = false;
+        
+        if (processMode === 'template') {
+            processBtn.innerHTML = '🚀 开始模板处理';
+        } else {
+            processBtn.innerHTML = '🚀 开始处理';
+        }
+        
+        setTimeout(() => {
+            progressContainer.classList.remove('show');
+            progressFill.style.width = '0%';
+        }, 2000);
+    }
+}
+
+// 监听自定义模板文件上传
+const templateFileInput = document.getElementById('templateFileInput');
+if (templateFileInput) {
+    templateFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                const text = await file.text();
+                customTemplateJson = JSON.parse(text);
+                selectedTemplateId = null;
+                addLog(`📋 已加载自定义模板：${customTemplateJson.name || '未命名模板'}`);
+                showAlert('自定义模板加载成功', 'success');
+            } catch (error) {
+                addLog(`❌ 模板文件解析失败：${error.message}`);
+                showAlert('模板文件格式错误，请确保是有效的 JSON 文件', 'error');
+                customTemplateJson = null;
+            }
+        }
+    });
 }

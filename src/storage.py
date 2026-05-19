@@ -50,10 +50,8 @@ class ConfigStorage:
         # 验证路径
         try:
             self._validate_storage_path()
-        except ValueError as e:
-            print(f"存储路径验证失败：{e}")
+        except (ValueError, Exception):
             self.storage_file = self.fallback_dir / self.DEFAULT_CONFIG_NAME
-            print(f"使用备用路径：{self.storage_file}")
         
         self.configs = {}
         self._load_configs()
@@ -85,19 +83,16 @@ class ConfigStorage:
                     if saved_path:
                         path = Path(saved_path)
                         if path.exists() or path.parent.exists():
-                            print(f"从路径指针加载配置路径：{path}")
                             return path
-            except Exception as e:
-                print(f"读取路径指针失败：{e}")
+            except Exception:
+                pass
         
         # 2. 检查默认位置
         default_path = self._get_default_storage_path()
         if default_path.exists():
-            print(f"使用默认配置路径：{default_path}")
             return default_path
         
         # 3. 使用默认位置
-        print(f"创建新的配置路径：{default_path}")
         return default_path
     
     def _save_path_pointer(self):
@@ -109,8 +104,8 @@ class ConfigStorage:
                     'storage_path': str(self.storage_file),
                     'version': '1.0'
                 }, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"保存路径指针失败：{e}")
+        except Exception:
+            pass
     
     def _validate_storage_path(self) -> bool:
         """
@@ -182,8 +177,7 @@ class ConfigStorage:
             with open(self.storage_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 self.configs = data.get('configs', {})
-        except Exception as e:
-            print(f"加载配置失败：{e}")
+        except Exception:
             self.configs = {}
     
     def _save_configs(self):
@@ -205,13 +199,10 @@ class ConfigStorage:
             self._save_path_pointer()
             
         except ValueError as e:
-            # 确保异常消息是纯字符串
             error_msg = str(e)
-            print(f"保存配置失败：{error_msg}")
             raise ValueError(error_msg) from e
         except Exception as e:
             error_msg = str(e)
-            print(f"保存配置失败：{error_msg}")
             raise
     
     def save_model_config(self, model_name: str, api_key: str, base_url: str, model: str) -> bool:
@@ -235,8 +226,7 @@ class ConfigStorage:
             }
             self._save_configs()
             return True
-        except Exception as e:
-            print(f"保存配置失败：{e}")
+        except Exception:
             return False
     
     def get_model_config(self, model_name: str) -> Optional[Dict[str, str]]:
