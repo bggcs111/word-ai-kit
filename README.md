@@ -34,7 +34,7 @@ WordAiKit是一个轻量级的Word文档智能处理工具，通过调用大语�
 
 ### 环境要求
 
-- Python 3.8+
+- Python (3.8~3.10) 
 - 操作系统：Windows / Linux / macOS
 
 ### 方式一：使用 Conda 环境
