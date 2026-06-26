@@ -32,28 +32,31 @@ WordAiKit是一个轻量级的Word文档智能处理工具，通过调用大语�
 
 ## 安装与使用
 
-### 环境要求
+### 基础环境要求
 
 - Python (3.8~3.10) 
 - 操作系统：Windows / Linux / macOS
 
-### 方式一：使用 Conda 环境
+推荐使用虚拟环境进行安装，可选conda或venv构建虚拟环境。
+
+### 方式一：使用 Conda 创建虚拟环境
 
 ```bash
 conda create -n wordaikit python=3.10
+
 conda activate wordaikit
-pip install -r requirements.txt
 ```
 
-### 方式二：使用 venv 虚拟环境
+### 方式二：使用 venv创建虚拟环境
 
 ```bash
 python -m venv venv
-# Windows
+
+# Windows系统激活虚拟环境:
 venv\Scripts\activate
-# Linux/macOS
+
+# Linux/macOS系统激活虚拟环境:
 source venv/bin/activate
-pip install -r requirements.txt
 ```
 
 ### 运行程序
