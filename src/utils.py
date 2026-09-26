@@ -6,6 +6,9 @@ import re
 import json
 from typing import Any, Dict
 
+from docx import Document
+from docx.shared import Pt
+
 
 def is_chart_title(text: str) -> bool:
     """判断文本是否是图表标题
@@ -28,6 +31,41 @@ def is_chart_title(text: str) -> bool:
         if re.match(pattern, text.strip(), re.IGNORECASE):
             return True
     return False
+
+
+def extract_caption(text: str, max_len: int = 40) -> str:
+    """从段落文本中提取图/表/公式的题注标题（caption）。
+
+    形如 "图1-1 系统架构"、"表1 参数对比"、"Figure 3.2 ..."、"图：硬件框图" 之类的
+    短句，通常紧邻在对应图表元素之后。若识别不到明确题注特征，则返回空字符串，
+    避免把图表后文的普通正文误当成题注——图表真实含义应由其前后文语义推断。
+    max_len 仅用于截断匹配到的题注正文，不影响是否判为题注。
+
+    Args:
+        text: 段落文本
+        max_len: 返回的题注最大长度
+
+    Returns:
+        提取到的题注文本；若无明确题注特征则返回空字符串
+    """
+    if not text:
+        return ""
+    t = text.strip()
+    patterns = [
+        r'^图\s*[\d.．\-—]*\s*[:：]?\s*.{0,%d}' % max_len,
+        r'^表\s*[\d.．\-—]*\s*[:：]?\s*.{0,%d}' % max_len,
+        r'^公式\s*[\d.．\-—]*\s*[:：]?\s*.{0,%d}' % max_len,
+        r'^Equation\s*[\d.．\-—]*\s*[:：]?\s*.{0,%d}' % max_len,
+        r'^(Figure|Table|Fig\.?)\s*[\d.．\-—]*\s*[:：]?\s*.{0,%d}' % max_len,
+        r'^图[片示]?[：:]?\s*.{0,20}',
+        r'^图示[：:]?\s*.{0,20}',
+        r'^[（(]图\s*\d+[）)][：:]?\s*.{0,%d}' % max_len,
+    ]
+    for p in patterns:
+        m = re.match(p, t, re.IGNORECASE)
+        if m:
+            return m.group(0).strip()
+    return ""
 
 
 def is_document_title_candidate(text: str) -> bool:
@@ -164,3 +202,38 @@ def ends_without_punctuation(text: str) -> bool:
     
     # 如果末尾不是标点符号，返回True
     return not re.search(punctuation + r'$', text)
+
+
+def calculate_max_image_width(doc: Document, char_margin: int = 4):
+    """计算图片允许的最大宽度，使图片左右留出指定字符数的空白。
+
+    中文字符在 Word 中宽度约等于当前字号（磅），因此 N 个字符的留白
+    按 N * 默认字体大小计算。python-docx 内部使用 EMU 为单位，Pt 值在
+    运算时会自动转换为 EMU，最终返回的也是 EMU 长度对象。
+
+    Args:
+        doc: 正在构建的 Word 文档对象
+        char_margin: 单侧留白对应的字符数，默认 4 个字符
+
+    Returns:
+        docx.shared.Length: 图片允许的最大宽度（EMU）
+    """
+    section = doc.sections[0]
+    # 页面可用宽度 = 页面宽度 - 左右边距
+    usable_width = section.page_width - section.left_margin - section.right_margin
+
+    # 以 Normal 样式的字体大小作为"一个字符"的宽度基准
+    font_size = doc.styles['Normal'].font.size
+    if font_size is None:
+        font_size = Pt(12)
+
+    # 单侧留白 = 字符数 * 字号；两侧共 2 * 字符数 * 字号
+    side_margin = Pt(char_margin * font_size.pt)
+    max_width = usable_width - 2 * side_margin
+
+    # 防止极端页面设置导致最大宽度过小，至少保留 1 英寸
+    min_width = Pt(72)
+    if max_width < min_width:
+        max_width = min_width
+
+    return max_width

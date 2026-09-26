@@ -285,6 +285,16 @@ class ConfigStorage:
         self._save_configs()
         return True
     
+    def get_setting(self, key: str) -> Optional[Any]:
+        """获取设置项"""
+        return self.configs.get(f'_setting_{key}')
+
+    def set_setting(self, key: str, value: Any) -> bool:
+        """设置设置项"""
+        self.configs[f'_setting_{key}'] = value
+        self._save_configs()
+        return True
+
     def get_storage_path(self) -> str:
         """获取配置文件路径"""
         return str(self.storage_file)

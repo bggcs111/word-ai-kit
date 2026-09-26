@@ -4,430 +4,155 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>WordAiKit - Word 文档智能处理</title>
+    <title>WordAiKit - 自然语言润色</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>📄 WordAiKit</h1>
-            <p>Word 文档智能处理服务 - 文字润色 · 保留图片/表格/公式</p>
-        </div>
-
-        <div class="status-bar">
-            <div class="status-item">
-                <span class="status-label">当前模型:</span>
-                <span class="model-badge" id="currentModel">加载中...</span>
+    <div class="app">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">WordAiKit</div>
+                <button class="btn-icon" id="newTaskBtn" title="新建任务">+</button>
             </div>
-            <div class="status-item">
-                <span class="status-label">服务状态:</span>
-                <span class="status-value" id="serviceStatus">检查中...</span>
+            <div class="task-list" id="taskList">
+                <!-- 任务列表由 JS 生成 -->
             </div>
-            <div class="status-item model-selector">
-                <span class="status-label">切换模型:</span>
-                <select id="modelSelect">
-                    <option value="">加载中...</option>
-                </select>
+            <div class="sidebar-footer">
+                <button class="btn-text" id="openConfigBtn">
+                    <span>⚙️</span> 模型配置
+                </button>
             </div>
-        </div>
+        </aside>
 
-        <div class="content">
-            <div id="alertContainer"></div>
-
-            <!-- 日志信息框 -->
-            <div class="section">
-                <div class="section-title">运行日志</div>
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <label style="font-weight: 500; color: #495057;">日志信息</label>
-                        <button class="btn btn-secondary" onclick="clearLogs()" style="padding: 6px 12px; font-size: 12px;">
-                            🗑️ 清除日志
-                        </button>
-                    </div>
-                    <textarea id="logBox" class="form-control" rows="6" readonly style="font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; resize: vertical; white-space: pre-wrap; word-wrap: break-word;"></textarea>
+        <!-- 主聊天区 -->
+        <main class="main">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <span class="current-task-name" id="currentTaskName" contenteditable="true" title="点击修改任务名称">新任务</span>
                 </div>
-            </div>
+                <div class="topbar-right">
+                    <div class="model-select-wrapper">
+                        <span class="model-label">模型</span>
+                        <select id="modelSelect" class="model-select">
+                            <option value="">加载中...</option>
+                        </select>
+                    </div>
+                    <span class="status-dot" id="serviceStatusDot" title="服务状态"></span>
+                </div>
+            </header>
 
-            <div class="section">
-                <div class="section-title">配置管理</div>
-                <div class="card">
-                    <div class="form-group">
-                        <label>配置方式</label>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <button class="btn btn-primary" onclick="openConfigModal()">
-                                ⚙️ 在线配置
-                            </button>
-                            <span style="color: #6c757d; font-size: 14px;">推荐使用在线配置，配置信息将安全保存</span>
-                        </div>
-                        <div class="file-hint" style="margin-top: 8px;">点击"配置管理"按钮通过 Web 界面配置 API Key，配置将自动保存到本地</div>
+            <div class="chat-container" id="chatContainer">
+                <div class="welcome" id="welcomeView">
+                    <div class="welcome-title">自然语言润色</div>
+                    <div class="welcome-desc">
+                        上传 Word 文档，用自然语言描述你想要的风格、结构或内容要求。<br>
+                        系统会保留原文核心内容与图片、表格、公式，重新生成连贯文章。
+                    </div>
+                    <div class="quick-actions">
+                        <button class="quick-btn" data-prompt="请用学术风格重写，逻辑严密，保留所有图表公式。">学术风格</button>
+                        <button class="quick-btn" data-prompt="请用通俗易懂的科普风格重写，保留所有图表公式。">科普风格</button>
+                        <button class="quick-btn" data-prompt="请重新组织文章结构，增加小标题，使层次更清晰，保留所有图表公式。">重新组织结构</button>
+                        <button class="quick-btn" data-prompt="请对原文进行精简，去除冗余表达，保留核心内容和所有图表公式。">精简表达</button>
                     </div>
                 </div>
+                <div class="messages" id="messages"></div>
             </div>
 
-            <div class="section">
-                <div class="section-title">处理模式</div>
-                <div class="card">
-                    <div class="form-group">
-                        <label>选择处理模式</label>
-                        <div style="display: flex; gap: 15px; margin-top: 10px;">
-                            <label style="display: flex; align-items: center; cursor: pointer;">
-                                <input type="radio" name="processMode" value="normal" checked onchange="toggleProcessMode()">
-                                <span style="margin-left: 8px;">📝 普通润色模式</span>
-                            </label>
-                            <label style="display: flex; align-items: center; cursor: pointer;">
-                                <input type="radio" name="processMode" value="template" onchange="toggleProcessMode()">
-                                <span style="margin-left: 8px;">📋 模板输出模式</span>
-                            </label>
-                        </div>
-                        <div class="file-hint" style="margin-top: 8px;">
-                            普通模式：单篇docx文字润色，保留图表和公式，支持多种写作风格，可自定义标题、格式等<br>
-                            模板模式：重新组织原文档内容，智能生成新文档并参照模板格式输出，保留图表和公式
-                        </div>
-                    </div>
-                    
-                    <!-- 文档类型选择 -->
-                    <div id="docTypeSection" style="margin-top: 15px;">
-                        <div class="form-group">
-                            <label for="docTypeSelect">📚 文档类型（可选）</label>
-                            <select id="docTypeSelect" class="form-control" style="margin-top: 5px;">
-                                <option value="">-- 保持原文风格（默认） --</option>
-                                <option value="技术文档">技术文档</option>
-                                <option value="学术论文">学术论文</option>
-                                <option value="调研报告">调研报告</option>
-                                <option value="自媒体文章">自媒体文章</option>
-                                <option value="custom">自定义...</option>
-                            </select>
-                            <div id="customDocTypeDiv" style="margin-top: 10px; display: none;">
-                                <label for="customDocType">自定义文档类型</label>
-                                <input type="text" id="customDocType" class="form-control" placeholder="例如：商业计划书、产品说明书、工作总结...">
-                            </div>
-                            <div class="file-hint" style="margin-top: 5px;">
-                                💡 选择或输入文档类型，系统将采用相应的写作风格；留空则保持原文风格
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 用户自定义要求 -->
-                    <div id="userPromptSection" style="margin-top: 15px;">
-                        <div class="form-group">
-                            <label for="userPrompt">💡 用户自定义要求（可选）</label>
-                            <textarea id="userPrompt" class="form-control" rows="5" placeholder="在此输入您的各种要求，AI 会自动识别并执行：
-
-例如：
-- 使用娱乐新闻风格
-- 划分3个章节并为每个章节生成标题
-
-..."></textarea>
-                            <div class="file-hint" style="margin-top: 5px;">
-                                💡 您可以在这里输入要求，如文档风格、章节或图表标题、内容修改等，AI会智能识别并执行
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 模板选择（仅在模板模式下显示） -->
-                    <div id="templateSelection" style="display: none; margin-top: 15px;">
-                        <!-- 模板处理策略说明 -->
-                        <div class="form-group" style="margin-bottom: 15px;">
-                            <label>🧠 模板处理策略</label>
-                            <div class="file-hint" style="margin-top: 8px;">
-                                <strong>AI生成式策略</strong>：AI理解原文后按模板生成新内容，更智能、更自然
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>📑 模板管理</label>
-                            <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
-                                <button class="btn btn-primary" onclick="openTemplateUploadModal()" style="padding: 8px 16px;">
-                                    📤 上传模板文档
-                                </button>
-                                <button class="btn btn-secondary" onclick="loadTemplates()" style="padding: 8px 16px;">
-                                    🔄 刷新模板列表
-                                </button>
-                            </div>
-                            <div class="file-hint" style="margin-top: 8px;">
-                                上传 Word 模板文档（.docx），系统将自动提取样式和结构
-                            </div>
-                        </div>
-                        
-                        <div class="form-group" style="margin-top: 15px;">
-                            <label for="templateSelect">选择已保存的模板</label>
-                            <select id="templateSelect" class="form-control" style="margin-top: 5px;">
-                                <option value="">-- 请选择模板 --</option>
-                            </select>
-                            <div id="templateInfo" class="file-hint" style="margin-top: 5px; display: none;"></div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>自定义模板 JSON（可选）</label>
-                            <input type="file" id="templateFileInput" accept=".json" style="margin-top: 5px;">
-                            <div class="file-hint" style="margin-top: 5px;">
-                                上传自定义模板 JSON 文件将覆盖选择的模板
-                            </div>
-                        </div>
-                    </div>
+            <div class="input-area">
+                <div class="file-preview" id="filePreview" style="display: none;">
+                    <span class="file-preview-name" id="filePreviewName"></span>
+                    <button class="file-preview-remove" id="filePreviewRemove" title="移除文件">×</button>
+                </div>
+                <div class="input-row">
+                    <button class="attach-btn" id="attachFileBtn" title="上传文档">📎</button>
+                    <input type="file" id="fileInput" accept=".docx" multiple style="display: none;">
+                    <textarea
+                        id="promptInput"
+                        class="prompt-input"
+                        rows="1"
+                        placeholder="输入你的要求，例如：请用正式的技术文档风格重写，分三个章节..."
+                    ></textarea>
+                    <button class="send-btn" id="sendBtn" title="开始处理">➤</button>
+                </div>
+                <div class="input-hint">
+                    支持 .docx 格式，可同时上传多个文档 · 提示词会自动保存到当前任务
                 </div>
             </div>
-            
-            <!-- 模板上传模态框 -->
-            <div id="templateUploadModal" class="modal" style="display: none;">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>📤 上传 Word 模板文档</h3>
-                        <span class="close" onclick="closeTemplateUploadModal()">&times;</span>
-                    </div>
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label>模板文档（.docx）</label>
-                            <input type="file" id="templateDocInput" accept=".docx">
-                            <div class="file-hint" style="margin-top: 5px;">
-                                上传包含格式和结构的 Word 文档，系统将自动提取模板信息
-                            </div>
-                        </div>
-                        <div id="templateUploadProgress" style="display: none; margin-top: 15px;">
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="templateProgressFill" style="width: 0%;"></div>
-                            </div>
-                            <div class="progress-text" id="templateProgressText">正在解析模板...</div>
-                        </div>
-                        <div id="templateUploadResult" style="display: none; margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;"></div>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-primary" onclick="uploadTemplateDocument()">📤 上传并解析</button>
-                        <button class="btn btn-secondary" onclick="closeTemplateUploadModal()">❌ 关闭</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="section">
-                <div class="section-title">上传文档</div>
-                <div class="card">
-                    <div class="file-input-wrapper">
-                        <input type="file" id="fileInput" accept=".docx" multiple>
-                        <label for="fileInput" class="file-input-label" id="fileLabel">
-                            <div class="file-icon">📄</div>
-                            <div class="file-name">点击上传文档</div>
-                            <div class="file-hint">支持 .docx 格式，可同时选择多个文档</div>
-                        </label>
-                    </div>
-                    <div id="fileList" style="display: none; margin-top: 10px;"></div>
-                    <div class="actions" style="margin-top: 20px;">
-                        <button class="btn btn-primary" id="processBtn" onclick="processDocument()" disabled>
-                            🚀 开始处理
-                        </button>
-                    </div>
-
-                    <div class="progress-container" id="progressContainer">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progressFill"></div>
-                        </div>
-                        <div class="progress-text" id="progressText">正在处理文档...</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="section result-section" id="resultSection">
-                <div class="section-title">处理结果</div>
-                <div class="result-info">
-                    <div class="result-icon">✅</div>
-                    <div class="result-details">
-                        <div class="result-title" id="resultTitle">处理成功</div>
-                        <div class="result-desc" id="resultDesc">文档已处理完成</div>
-                    </div>
-                </div>
-                <div class="actions">
-                    <button class="btn btn-success" onclick="downloadResult()">
-                        ⬇️ 下载处理后的文档
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 页面底部 - 项目信息 -->
-        <div class="footer">
-            <div class="footer-content">
-                <!-- 项目地址 -->
-                <div class="footer-item">
-                    <span class="footer-label">项目地址：</span>
-                    <span class="footer-value">
-                        <a href="https://github.com/bggcs111/word-ai-kit" target="_blank">https://github.com/bggcs111/word-ai-kit</a>
-                    </span>
-                </div>
-               
-                
-                <!-- 软件版本项 -->
-                <div class="footer-item">
-                    <span class="footer-label">软件版本：</span>
-                    <span class="footer-value">v2.0.0</span>
-                </div>
-            </div>
-        </div>
+        </main>
     </div>
 
-    <!-- 配置管理模态框 -->
+    <!-- 配置模态框 -->
     <div id="configModal" class="modal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>⚙️ 模型配置管理</h3>
-                <span class="close" onclick="closeConfigModal()">&times;</span>
+                <h3>模型配置</h3>
+                <span class="close" id="closeConfigModal">×</span>
             </div>
             <div class="modal-body">
-                <!-- 配置文件路径管理 -->
                 <div class="storage-path-section">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label>📁 配置文件保存路径</label>
-                        <div style="display: flex; gap: 10px; align-items: stretch;">
-                            <input type="text" class="form-control" id="storagePath" placeholder="例如：C:\Users\用户名\Documents 或 D:\MyConfig" style="flex: 1;">
-                            <button class="btn btn-secondary" onclick="saveStoragePath()" style="white-space: nowrap;">💾 保存路径</button>
+                    <div class="form-group">
+                        <label>配置文件保存路径</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="storagePath" placeholder="例如：C:\Users\用户名\Documents">
+                            <button class="btn btn-secondary" id="saveStoragePathBtn">保存路径</button>
                         </div>
-                        <small style="color: #6c757d; display: block; margin-top: 8px;">
-                            💡 请填写<strong>完整绝对路径</strong>（如：C:\Users\用户名\Documents）
-                        </small>
-                        <small style="color: #dc3545; display: block; margin-top: 3px;">
-                            ⚠️ 配置文件不能保存在项目目录中，建议保存在文档目录或自定义目录
-                        </small>
+                        <small class="form-hint">请填写完整绝对路径，不要保存在项目目录中。</small>
                     </div>
                 </div>
 
-                <div class="config-tabs">
-                    <button class="tab-btn active" onclick="openTab('deepseek')">DeepSeek</button>
-                    <button class="tab-btn" onclick="openTab('aliyun')">阿里百炼</button>
-                    <button class="tab-btn" onclick="openTab('kimi')">Kimi</button>
-                    <button class="tab-btn" onclick="openTab('ollama')">Ollama</button>
-                    <button class="tab-btn" onclick="openTab('lmstudio')">LM Studio</button>
+                <div class="config-tabs" id="configTabs">
+                    <button class="tab-btn active" data-tab="deepseek">DeepSeek</button>
+                    <button class="tab-btn" data-tab="aliyun">阿里百炼</button>
+                    <button class="tab-btn" data-tab="kimi">Kimi</button>
+                    <button class="tab-btn" data-tab="ollama">Ollama</button>
+                    <button class="tab-btn" data-tab="lmstudio">LM Studio</button>
                 </div>
-                
-                <div id="deepseek" class="tab-content active">
-                    <div class="form-group">
-                        <label for="deepseekApiKey">API Key</label>
-                        <input type="password" class="form-control" id="deepseekApiKey" placeholder="输入 DeepSeek API Key">
+
+                <div class="tab-contents">
+                    <div id="deepseek" class="tab-content active">
+                        <div class="form-group"><label>API Key</label><input type="password" class="form-control" id="deepseekApiKey" placeholder="输入 DeepSeek API Key"></div>
+                        <div class="form-group"><label>Base URL</label><input type="text" class="form-control" id="deepseekBaseUrl" value="https://api.deepseek.com"></div>
+                        <div class="form-group"><label>模型名称</label><input type="text" class="form-control" id="deepseekModel" value="deepseek-chat"></div>
                     </div>
-                    <div class="form-group">
-                        <label for="deepseekBaseUrl">Base URL</label>
-                        <input type="text" class="form-control" id="deepseekBaseUrl" value="https://api.deepseek.com">
+                    <div id="aliyun" class="tab-content">
+                        <div class="form-group"><label>API Key</label><input type="password" class="form-control" id="aliyunApiKey" placeholder="输入阿里百炼 API Key"></div>
+                        <div class="form-group"><label>Base URL</label><input type="text" class="form-control" id="aliyunBaseUrl" value="https://dashscope.aliyuncs.com/compatible-mode/v1"></div>
+                        <div class="form-group"><label>模型名称</label><input type="text" class="form-control" id="aliyunModel" value="qwen3.5-plus"></div>
                     </div>
-                    <div class="form-group">
-                        <label for="deepseekModel">模型名称</label>
-                        <input type="text" class="form-control" id="deepseekModel" value="deepseek-chat">
+                    <div id="kimi" class="tab-content">
+                        <div class="form-group"><label>API Key</label><input type="password" class="form-control" id="kimiApiKey" placeholder="输入 Kimi API Key"></div>
+                        <div class="form-group"><label>Base URL</label><input type="text" class="form-control" id="kimiBaseUrl" value="https://api.moonshot.cn/v1"></div>
+                        <div class="form-group"><label>模型名称</label><input type="text" class="form-control" id="kimiModel" value="kimi-k2.5"></div>
                     </div>
-                </div>
-                
-                <div id="aliyun" class="tab-content">
-                    <div class="form-group">
-                        <label for="aliyunApiKey">API Key</label>
-                        <input type="password" class="form-control" id="aliyunApiKey" placeholder="输入阿里百炼 API Key">
+                    <div id="ollama" class="tab-content">
+                        <div class="form-group"><label>API Key</label><input type="text" class="form-control" id="ollamaApiKey" value="ollama"></div>
+                        <div class="form-group"><label>Base URL</label><input type="text" class="form-control" id="ollamaBaseUrl" value="http://localhost:11434/v1"></div>
+                        <div class="form-group"><label>模型名称</label><input type="text" class="form-control" id="ollamaModel" value="qwen2.5:7b"></div>
                     </div>
-                    <div class="form-group">
-                        <label for="aliyunBaseUrl">Base URL</label>
-                        <input type="text" class="form-control" id="aliyunBaseUrl" value="https://dashscope.aliyuncs.com/compatible-mode/v1">
-                    </div>
-                    <div class="form-group">
-                        <label for="aliyunModel">模型名称</label>
-                        <input type="text" class="form-control" id="aliyunModel" value="qwen3.5-plus">
+                    <div id="lmstudio" class="tab-content">
+                        <div class="form-group"><label>API Key</label><input type="text" class="form-control" id="lmstudioApiKey" value="lmstudio"></div>
+                        <div class="form-group"><label>Base URL</label><input type="text" class="form-control" id="lmstudioBaseUrl" value="http://localhost:1234/v1"></div>
+                        <div class="form-group"><label>模型名称</label><input type="text" class="form-control" id="lmstudioModel" value="local-model"></div>
                     </div>
                 </div>
-                
-                <div id="kimi" class="tab-content">
-                    <div class="form-group">
-                        <label for="kimiApiKey">API Key</label>
-                        <input type="password" class="form-control" id="kimiApiKey" placeholder="输入 Kimi API Key">
-                    </div>
-                    <div class="form-group">
-                        <label for="kimiBaseUrl">Base URL</label>
-                        <input type="text" class="form-control" id="kimiBaseUrl" value="https://api.moonshot.cn/v1">
-                    </div>
-                    <div class="form-group">
-                        <label for="kimiModel">模型名称</label>
-                        <input type="text" class="form-control" id="kimiModel" value="kimi-k2.5">
-                    </div>
-                </div>
-                
-                <div id="ollama" class="tab-content">
-                    <div class="form-group">
-                        <label for="ollamaApiKey">API Key</label>
-                        <input type="text" class="form-control" id="ollamaApiKey" value="ollama" placeholder="Ollama 默认不需要 API Key">
-                        <small style="color: #6c757d; display: block; margin-top: 5px;">
-                            💡 Ollama 默认不需要 API Key，使用默认值即可
-                        </small>
-                    </div>
-                    <div class="form-group">
-                        <label for="ollamaBaseUrl">Base URL</label>
-                        <input type="text" class="form-control" id="ollamaBaseUrl" value="http://localhost:11434/v1">
-                        <small style="color: #6c757d; display: block; margin-top: 5px;">
-                            💡 Ollama 默认地址：http://localhost:11434/v1
-                        </small>
-                    </div>
-                    <div class="form-group">
-                        <label for="ollamaModel">模型名称</label>
-                        <input type="text" class="form-control" id="ollamaModel" value="qwen2.5:7b">
-                        <small style="color: #6c757d; display: block; margin-top: 5px;">
-                            💡 常见模型：qwen2.5:7b, llama3.1:8b, deepseek-r1:8b 等
-                        </small>
-                    </div>
-                </div>
-                
-                <div id="lmstudio" class="tab-content">
-                    <div class="form-group">
-                        <label for="lmstudioApiKey">API Key</label>
-                        <input type="text" class="form-control" id="lmstudioApiKey" value="lmstudio" placeholder="LM Studio 默认不需要 API Key">
-                        <small style="color: #6c757d; display: block; margin-top: 5px;">
-                            💡 LM Studio 默认不需要 API Key，使用默认值即可
-                        </small>
-                    </div>
-                    <div class="form-group">
-                        <label for="lmstudioBaseUrl">Base URL</label>
-                        <input type="text" class="form-control" id="lmstudioBaseUrl" value="http://localhost:1234/v1">
-                        <small style="color: #6c757d; display: block; margin-top: 5px;">
-                            💡 LM Studio 默认地址：http://localhost:1234/v1
-                        </small>
-                    </div>
-                    <div class="form-group">
-                        <label for="lmstudioModel">模型名称</label>
-                        <input type="text" class="form-control" id="lmstudioModel" value="local-model">
-                        <small style="color: #6c757d; display: block; margin-top: 5px;">
-                            💡 LM Studio 会自动使用加载的模型，通常使用 local-model 即可
-                        </small>
-                    </div>
-                </div>
-                
+
                 <div class="config-status" id="configStatus">
-                    <div class="status-item">
-                        <span class="status-label">DeepSeek:</span>
-                        <span class="status-badge" id="deepseekStatus">未配置</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">阿里百炼:</span>
-                        <span class="status-badge" id="aliyunStatus">未配置</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">Kimi:</span>
-                        <span class="status-badge" id="kimiStatus">未配置</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">Ollama:</span>
-                        <span class="status-badge" id="ollamaStatus">未配置</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">LM Studio:</span>
-                        <span class="status-badge" id="lmstudioStatus">未配置</span>
-                    </div>
+                    <!-- 由 JS 填充 -->
                 </div>
 
-                <!-- 测试结果显示区域 -->
                 <div class="test-result" id="testResult">
                     <div class="test-result-title" id="testResultTitle"></div>
                     <div class="test-result-content" id="testResultContent"></div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="testCurrentConfig()">🧪 测试配置</button>
-                <button class="btn btn-primary" onclick="saveCurrentConfig()">💾 保存配置</button>
-                <button class="btn btn-secondary" onclick="closeConfigModal()">❌ 关闭</button>
+                <button class="btn btn-secondary" id="testConfigBtn">测试配置</button>
+                <button class="btn btn-primary" id="saveConfigBtn">保存配置</button>
             </div>
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=20260428"></script>
+    <script src="/static/js/app.js?v=20260919"></script>
 </body>
 </html>

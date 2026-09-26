@@ -68,6 +68,23 @@ class ConfigManager:
         if self.storage and self.storage.get_current_model():
             self.current_model = self.storage.get_current_model()
 
+        # 工具调用模式开关（默认启用）
+        self.use_tool_calling = True
+        if self.storage:
+            stored_val = self.storage.get_setting('use_tool_calling')
+            if stored_val is not None:
+                self.use_tool_calling = bool(stored_val)
+
+        # 单次处理正文最长文本限制（默认 60000 字）
+        self.max_text_chars = 60000
+        if self.storage:
+            stored_val = self.storage.get_setting('max_text_chars')
+            if stored_val is not None:
+                try:
+                    self.max_text_chars = int(stored_val)
+                except (TypeError, ValueError):
+                    pass
+
         self._build_models_config()
         ConfigManager._initialized = True
 
@@ -185,3 +202,36 @@ class ConfigManager:
                 return False
         except (ValueError, Exception):
             return False
+
+    def get_use_tool_calling(self) -> bool:
+        """获取是否使用工具调用模式"""
+        return self.use_tool_calling
+
+    def get_max_text_chars(self) -> int:
+        """获取单次处理正文最长文本限制"""
+        return self.max_text_chars
+
+    def set_max_text_chars(self, limit: int) -> bool:
+        """设置单次处理正文最长文本限制，返回是否成功"""
+        try:
+            self.max_text_chars = int(limit)
+        except (TypeError, ValueError):
+            return False
+        if not self.storage:
+            return True
+        return bool(self.storage.set_setting('max_text_chars', self.max_text_chars))
+
+    def set_use_tool_calling(self, enabled: bool) -> bool:
+        """
+        设置是否使用工具调用模式
+
+        Args:
+            enabled: 是否启用
+
+        Returns:
+            bool: 是否成功
+        """
+        self.use_tool_calling = enabled
+        if self.storage:
+            return self.storage.set_setting('use_tool_calling', enabled)
+        return True

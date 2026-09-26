@@ -1,83 +1,57 @@
 """
 WordAiKit - Word 文档智能处理服务
-主程序入口
+主程序入口（Streamlit WebUI）
 """
+import os
+import sys
 import webbrowser
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from api.routes import router
-from src.config import ConfigManager
-from src.logger import log_info, log_error, log_success
-from src.cache_manager import clear_cache_on_exit
-import uvicorn
+import subprocess
 import atexit
 
-# 初始化配置管理器
-config_manager = ConfigManager()
-# 将 ConfigManager 实例传递给 routes 模块
-from api import routes
-routes.set_config_manager(config_manager)
+# 将项目根目录加入路径
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT_DIR)
+
+from src.cache_manager import clear_cache_on_exit
+from src.logger import log_info
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """应用生命周期管理"""
-    # 启动时执行
-    log_info("Word 智能处理服务启动")
-
-    # 延迟打开浏览器，确保服务已启动
-    import asyncio
-    asyncio.create_task(open_browser())
-
-    yield
-    # 关闭时执行（清理缓存资源）
-    clear_cache_on_exit(keep_recent_uploads=0)
-    log_info("Word 智能处理服务关闭")
-
-
-# 创建 FastAPI 应用（不挂载根路径，避免与 API 路由冲突）
-app = FastAPI(
-    title="WordAiKit",
-    description="Word 文档智能处理服务（支持文字润色、保留图片/表格/公式）",
-    version="V0.1",
-    lifespan=lifespan
-)
-
-# 注册 API 路由（添加 /api 前缀以避免与静态文件冲突）
-app.include_router(router, prefix="/api")
-
-# 挂载静态文件目录（提供前端界面，在 API 路由之后）
-import os
-static_path = os.path.join(os.path.dirname(__file__), "static")
-
-# 根路由返回 index.html
-@app.get("/")
-async def serve_index():
-    """返回前端主页"""
-    index_path = os.path.join(static_path, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {"message": "WordAiKit API Service", "docs": "/docs"}
-
-if os.path.exists(static_path):
-    # 挂载静态文件到 /static 路径
-    app.mount("/static", StaticFiles(directory=static_path), name="static")
-
-
-async def open_browser():
+def open_browser():
     """延迟打开浏览器"""
-    import asyncio
-    await asyncio.sleep(1.5)  # 等待服务完全启动
-    webbrowser.open("http://localhost:8000")
+    import time
+    time.sleep(2)
+    webbrowser.open("http://localhost:8501")
 
 
 if __name__ == "__main__":
     atexit.register(clear_cache_on_exit, keep_recent_uploads=0)
-    
+
+    log_info("WordAiKit Streamlit 服务启动")
+
+    # 延迟打开浏览器
+    import threading
+    t = threading.Thread(target=open_browser, daemon=True)
+    t.start()
+
+    # 启动 Streamlit
+    streamlit_path = os.path.join(ROOT_DIR, ".venv", "Scripts", "streamlit.exe")
+    if not os.path.exists(streamlit_path):
+        streamlit_path = "streamlit"
+
+    app_path = os.path.join(ROOT_DIR, "app_streamlit.py")
+
+    # 写入用户目录的 credentials.toml 跳过首次邮件提示
+    user_streamlit_dir = os.path.join(os.path.expanduser("~"), ".streamlit")
+    os.makedirs(user_streamlit_dir, exist_ok=True)
+    cred_path = os.path.join(user_streamlit_dir, "credentials.toml")
+    if not os.path.exists(cred_path):
+        with open(cred_path, "w", encoding="utf-8") as f:
+            f.write('[general]\nemail = ""\n')
+
     try:
-        uvicorn.run(app, host="0.0.0.0", port=8000)
+        subprocess.run(
+            [streamlit_path, "run", app_path, "--server.port", "8501", "--server.headless", "true"],
+            cwd=ROOT_DIR,
+        )
     except KeyboardInterrupt:
-        print("\n👋 收到中断信号，程序即将退出...")
-        # 缓存清理会在 atexit 中自动执行
+        print("\n收到中断信号，程序即将退出...")

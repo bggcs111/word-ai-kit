@@ -9,6 +9,11 @@ from docx import Document
 from src.constants import INDEPENDENT_FORMULA_TEXT_THRESHOLD
 
 
+class DocumentParseStopped(Exception):
+    """文档解析被用户中止时抛出。"""
+    pass
+
+
 class DocumentParser:
     """文档解析器"""
     
@@ -23,15 +28,19 @@ class DocumentParser:
         self.i_count = 1
         self.f_count = 1
     
-    def parse(self, doc_path: str) -> Tuple[List, Dict, Document]:
+    def parse(self, doc_path: str, stop_event=None) -> Tuple[List, Dict, Document]:
         """
         解析 Word 文档
-        
+
         Args:
             doc_path: 文档路径
-            
+            stop_event: 可选的 threading.Event，用于中途停止解析（用户点击停止时置位）
+
         Returns:
             (elements, paragraphs, original_doc)
+
+        Raises:
+            DocumentParseStopped: 当 stop_event 被置位时抛出
         """
         doc = Document(doc_path)
         self.elements = []
@@ -46,6 +55,8 @@ class DocumentParser:
         
         # 遍历 body 中的所有子元素（包括段落和表格）
         for child in body.iterchildren():
+            if stop_event is not None and stop_event.is_set():
+                raise DocumentParseStopped()
             if child.tag.endswith('p'):  # 段落
                 self._parse_paragraph(child, doc)
             elif child.tag.endswith('tbl'):  # 表格
