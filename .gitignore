@@ -3,12 +3,17 @@
 *.env
 .env.local
 .env.*.local
+.streamlit/secrets.toml
+.streamlit/credentials.toml
+
+# 运行时状态文件
+.tasks.json
 
 # 上传和临时文件
 uploads/
 temp/
 logs/
-templates/
+/templates/
 
 # Python
 __pycache__/
@@ -37,6 +42,7 @@ venv/
 # IDE
 .vscode/
 .idea/
+.trae/
 *.swp
 *.swo
 *~
@@ -48,6 +54,7 @@ Thumbs.db
 # 日志文件
 *.log
 
-#word
-.doc
-.docx
+# 本地测试文档（Word 等，防止误上传）
+*.doc
+*.docx
+*.docm

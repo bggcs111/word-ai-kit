@@ -258,7 +258,7 @@ def process_documents(uploaded_files, user_prompt, stop_event=None, config_manag
                     all_paragraphs.update(paragraphs)
                     all_elements.extend(elements)
 
-                from api.routes import extract_document_info
+                from src.utils import extract_document_info
                 current_order = [elem[1] for elem in elements]
                 doc_info = extract_document_info(safe_filename, paragraphs, current_order)
                 all_doc_info[safe_filename] = doc_info

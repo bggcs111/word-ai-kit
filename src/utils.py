@@ -2,9 +2,10 @@
 工具模块 - 提供通用的工具函数
 避免代码重复，保持模块间低耦合
 """
+import os
 import re
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from docx import Document
 from docx.shared import Pt
@@ -237,3 +238,155 @@ def calculate_max_image_width(doc: Document, char_margin: int = 4):
         max_width = min_width
 
     return max_width
+
+
+def extract_document_info(filename: str, paragraphs: Dict, current_order: List[str]) -> Dict:
+    """提取文档信息（标题/类型/章节），用于 AI 处理时的上下文"""
+    doc_info = {
+        'title': '',
+        'type': '其他类型',
+        'section': ''
+    }
+
+    title_from_filename = os.path.splitext(filename)[0]
+    for prefix in ['processed_', 'output_', 'test_', 'demo_', 'nl_']:
+        if title_from_filename.startswith(prefix):
+            title_from_filename = title_from_filename[len(prefix):]
+
+    sample_texts = []
+    for elem_id in current_order[:15]:
+        if elem_id.startswith('P') and elem_id in paragraphs:
+            para_data = paragraphs[elem_id]
+            if isinstance(para_data, tuple):
+                text = para_data[0]
+            else:
+                text = para_data
+            if text:
+                sample_texts.append(text)
+
+    combined_text = ' '.join(sample_texts)
+    doc_type = identify_document_type(combined_text)
+    doc_info['type'] = doc_type
+
+    title_from_content = extract_title_from_content(sample_texts)
+    if title_from_content:
+        doc_info['title'] = title_from_content
+    elif title_from_filename and len(title_from_filename) > 2:
+        doc_info['title'] = title_from_filename
+    else:
+        doc_info['title'] = f'未命名文档（{doc_type}）'
+
+    section_title = identify_section_title(sample_texts)
+    if section_title:
+        doc_info['section'] = section_title
+    else:
+        doc_info['section'] = infer_section_from_content(sample_texts, doc_type)
+
+    return doc_info
+
+
+def identify_document_type(text: str) -> str:
+    """根据文本内容识别文档类型"""
+    text_lower = text.lower()
+
+    tech_keywords = ['设计', '方案', '系统', '架构', '模块', '接口', '实现', '功能', '技术', '平台', '部署']
+    academic_keywords = ['摘要', '关键词', '引言', '结论', '参考文献', '研究', '实验', '分析', '方法', '理论', '模型']
+    test_keywords = ['测试', '报告', '结果', '数据', '性能', '验证', '检测', '通过率', '错误', 'bug', '用例']
+    survey_keywords = ['调研', '调查', '市场', '趋势', '分析', '现状', '发展', '需求', '用户', '行业']
+    project_keywords = ['项目', '计划', '进度', '目标', '任务', '资源', '风险', '预算', '里程碑', '交付']
+
+    scores = {
+        '技术方案/设计文档': sum(1 for kw in tech_keywords if kw in text_lower),
+        '学术论文': sum(1 for kw in academic_keywords if kw in text_lower),
+        '测试报告': sum(1 for kw in test_keywords if kw in text_lower),
+        '调研报告': sum(1 for kw in survey_keywords if kw in text_lower),
+        '项目文档': sum(1 for kw in project_keywords if kw in text_lower),
+    }
+
+    max_score = max(scores.values())
+    if max_score > 0:
+        for doc_type, score in scores.items():
+            if score == max_score:
+                return doc_type
+
+    return '其他类型'
+
+
+def identify_section_title(texts: List[str]) -> str:
+    """识别章节标题"""
+    for text in texts[:5]:
+        if len(text) < 100:
+            patterns = [
+                r'^(\d+\.?\d*)\s+',
+                r'^第 [一二三四五六七八九十]+[章节部分]',
+                r'^[A-Z]\.\s+',
+                r'^\d+\s+[、.．]',
+            ]
+            for pattern in patterns:
+                if re.match(pattern, text):
+                    return text.strip()
+    return ''
+
+
+def extract_title_from_content(texts: List[str]) -> str:
+    """从内容中提取文档标题"""
+    for text in texts[:3]:
+        text_stripped = text.strip()
+        if (5 <= len(text_stripped) <= 50 and
+            '。' not in text_stripped and
+            '！' not in text_stripped and
+            '？' not in text_stripped):
+            title_keywords = ['设计', '方案', '报告', '论文', '说明', '文档', '系统', '研究']
+            if any(kw in text_stripped for kw in title_keywords):
+                return text_stripped
+    return ''
+
+
+def infer_section_from_content(texts: List[str], doc_type: str) -> str:
+    """根据内容推断章节信息"""
+    combined_text = ' '.join(texts).lower()
+
+    if doc_type == '学术论文':
+        if any(kw in combined_text for kw in ['摘要', 'abstract']):
+            return '摘要部分'
+        elif any(kw in combined_text for kw in ['引言', '前言', '背景']):
+            return '引言部分'
+        elif any(kw in combined_text for kw in ['结论', '总结']):
+            return '结论部分'
+        elif any(kw in combined_text for kw in ['方法', '实验', '结果']):
+            return '正文部分'
+    elif doc_type == '技术方案/设计文档':
+        if any(kw in combined_text for kw in ['概述', '简介', '背景']):
+            return '概述部分'
+        elif any(kw in combined_text for kw in ['需求', '目标']):
+            return '需求分析'
+        elif any(kw in combined_text for kw in ['设计', '方案', '架构']):
+            return '设计方案'
+        elif any(kw in combined_text for kw in ['实现', '代码']):
+            return '实现部分'
+    elif doc_type == '测试报告':
+        if any(kw in combined_text for kw in ['概述', '简介']):
+            return '测试概述'
+        elif any(kw in combined_text for kw in ['环境', '配置']):
+            return '测试环境'
+        elif any(kw in combined_text for kw in ['结果', '数据']):
+            return '测试结果'
+        elif any(kw in combined_text for kw in ['结论', '建议']):
+            return '测试结论'
+    elif doc_type == '调研报告':
+        if any(kw in combined_text for kw in ['概述', '背景']):
+            return '调研背景'
+        elif any(kw in combined_text for kw in ['现状', '市场']):
+            return '市场现状'
+        elif any(kw in combined_text for kw in ['分析', '趋势']):
+            return '趋势分析'
+        elif any(kw in combined_text for kw in ['结论', '建议']):
+            return '调研结论'
+
+    if texts:
+        first_text = texts[0].strip() if texts else ''
+        if len(first_text) < 30:
+            return '开头部分'
+        else:
+            return '正文部分'
+    return '文档主体部分'
