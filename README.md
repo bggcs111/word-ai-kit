@@ -1,6 +1,7 @@
-# WordAiKit
+<h1 align="center">WordAiKit</h1>
 
-这是一个轻量级的Word文档智能处理工具，通过调用大语言模型 API 对 Word 文档(docx格式)进行文字润色、标题生成、参考模板输出等处理，帮助用户快速提升文档质量。
+
+WordAiKit是一个轻量级的Word文档智能处理工具，通过调用大语言模型 API 对 Word 文档(docx格式)进行文字润色、标题生成、参考模板输出等处理，帮助用户快速提升文档质量。
 
 <img width="550" height="610" alt="image" src="https://github.com/user-attachments/assets/5d89b799-85a9-4e99-9770-98ff089ef606" />
 
@@ -12,6 +13,12 @@
 
 2026-3-15：V1.0.0 (初始版本)
 - 基础的智能文字润色和复杂元素(图 表 公式)保留功能
+
+## 后续计划
+- [ ] 优化前端, UI更简洁
+- [ ] 验证本地模型接入的效果
+- [ ] 进一步提升自定义指令编辑的精准性
+
 
 ## 主要亮点
 - 智能文字润色：修正语法、错别字，提升语句连贯性, 并自动生成文档图表标题
@@ -25,28 +32,31 @@
 
 ## 安装与使用
 
-### 环境要求
+### 基础环境要求
 
-- Python 3.8+
+- Python (3.8~3.10) 
 - 操作系统：Windows / Linux / macOS
 
-### 方式一：使用 Conda 环境
+推荐使用虚拟环境进行安装，可选conda或venv构建虚拟环境。
+
+### 方式一：使用 Conda 创建虚拟环境
 
 ```bash
 conda create -n wordaikit python=3.10
+
 conda activate wordaikit
-pip install -r requirements.txt
 ```
 
-### 方式二：使用 venv 虚拟环境
+### 方式二：使用 venv创建虚拟环境
 
 ```bash
 python -m venv venv
-# Windows
+
+# Windows系统激活虚拟环境:
 venv\Scripts\activate
-# Linux/macOS
+
+# Linux/macOS系统激活虚拟环境:
 source venv/bin/activate
-pip install -r requirements.txt
 ```
 
 ### 运行程序
@@ -70,9 +80,9 @@ python main.py
 | 阿里云通义    | <https://dashscope.console.aliyun.com> |
 | Kimi     | <https://platform.moonshot.cn>         |
 
+
 ## 许可与联系
 
 - 许可证：MIT License
-- QQ交流群：1081856288
-- 邮箱：bggcs111@163.com
+- 联系邮箱：bggcs111@163.com
 
