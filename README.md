@@ -1,7 +1,7 @@
 <h1 align="center">WordAiKit</h1>
 
 
-WordAiKit是一个轻量级的Word文档智能处理工具，通过调用大语言模型 API 对 Word 文档(docx格式)进行文字润色、标题生成、参考模板输出等处理，帮助用户快速提升文档质量。
+WordAiKit是一个轻量级的Word文档智能处理工具，能够对 Word 文档(docx格式)进行文字润色、标题生成、风格改写等处理，同时可以保留原文中的图片、表格、公式等复杂元素。这个工具旨在帮助用户高效地处理自己的草稿、随笔等非正式文档，借助大模型能力让自己的随手一记变得更专业更规范，但又不会改变原文的核心内容。
 
 <p align="center"><img width="720" alt="WordAiKit 界面截图" src="assets/screenshot.png" /></p>
 
@@ -40,7 +40,7 @@ WordAiKit是一个轻量级的Word文档智能处理工具，通过调用大语�
 - Python (3.8~3.10) 
 - 操作系统：Windows / Linux / macOS
 
-推荐使用虚拟环境进行安装，可选conda或venv构建虚拟环境。
+使用前需要先下载WordAiKit项目，然后在项目目录下，根据你自己的电脑环境选择以下任意一种方式创建一个虚拟环境：conda或venv。
 
 ### 方式一：使用 Conda 创建虚拟环境
 
