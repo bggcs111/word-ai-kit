@@ -40,7 +40,12 @@ WordAiKit是一个轻量级的Word文档智能处理工具，能够对 Word 文�
 - Python (3.8~3.10) 
 - 操作系统：Windows / Linux / macOS
 
-使用前需要先下载WordAiKit项目，然后在项目目录下，根据你自己的电脑环境选择以下任意一种方式创建一个虚拟环境：conda或venv。
+使用前需要先下载WordAiKit项目：
+```bash
+git clone https://github.com/bggcs111/word-ai-kit.git
+```
+
+然后在项目目录下，根据你自己的电脑环境选择以下任意一种方式创建一个虚拟环境：conda或venv。
 
 ### 方式一：使用 Conda 创建虚拟环境
 
