@@ -43,6 +43,9 @@ WordAiKit是一个轻量级的Word文档智能处理工具，能够对 Word 文�
 使用前需要先下载WordAiKit项目：
 ```bash
 git clone https://github.com/bggcs111/word-ai-kit.git
+
+cd word-ai-kit
+
 ```
 
 然后在项目目录下，根据你自己的电脑环境选择以下任意一种方式创建一个虚拟环境：conda或venv。
@@ -65,6 +68,14 @@ python -m venv .venv
 
 # Linux/macOS系统激活虚拟环境:
 source .venv/bin/activate
+```
+
+### 安装依赖
+
+国内不好连接pipy可以加入国内镜像-i https://pypi.tuna.tsinghua.edu.cn/simple。
+
+```bash
+pip install -r requirements.txt #-i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 ### 运行程序
