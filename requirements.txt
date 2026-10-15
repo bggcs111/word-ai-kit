@@ -1,6 +1,9 @@
 # Document processing
 python-docx==0.8.11
 
+# WebUI
+streamlit>=1.30.0
+
 # AI client
 openai>=1.10.0
 httpx==0.24.1
